@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <h1 class="text-center">RVTools Analyzer</h1>
+    <form method="post" enctype="multipart/form-data" class="mt-4">
+        <div class="mb-3">
+            <label for="file" class="form-label">Upload RVTools Excel File</label>
+            <input class="form-control" type="file" id="file" name="file" accept=".xlsx">
+        </div>
+        <div class="d-flex justify-content-between">
+            <button formaction="/explore" type="submit" class="btn btn-primary">Explore File Content</button>
+            <button formaction="/analyze" type="submit" class="btn btn-warning">Analyze Migration Risks</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

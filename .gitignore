@@ -1,0 +1,7 @@
+.python-version
+__pycache__/
+tests/__pycache__/
+build/
+*.egg-info/
+test-data/
+*.code-workspace

@@ -1,0 +1,3 @@
+include requirements.txt
+include rvtools_analyzer/static/*
+include rvtools_analyzer/templates/*
