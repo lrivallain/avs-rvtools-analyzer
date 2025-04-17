@@ -1,27 +1,50 @@
-# RVTools Analyzer
+# AVS RVTools Analyzer
 
-RVTools Analyzer is a Flask-based application for analyzing RVTools data. It provides insights into migration risks and allows users to explore the content of uploaded RVTools Excel files.
+AVS RVTools Analyzer is a Flask-based application for analyzing RVTools data. It provides insights into migration risks and allows users to explore the content of uploaded RVTools Excel files.
 
-## Installation and Usage
+## Features
+- Upload RVTools Excel files for analysis.
+- View detailed information about the contents of the uploaded files.
+- Analyze migration risks based on the data in the files:
+  - USB devices
+  - Disks with migration risks
+  - Non dvSwitch network interfaces
+  - Snapshots
+  - Suspended VMs
+  - dvPort issues
+  - non Intel CPUs
+  - Mounted CD/DVD drives
+  - Oracle VMs
+  - Large provisioned disks
+
+
+## Installation
 
 Follow these steps to set up and run the application:
 
-### 1. Clone the Repository
-First, clone the repository from GitHub:
+### From PyPI
+
+You can install RVTools Analyzer directly from PyPI using pip:
+```bash
+pip install avs-rvtools-analyzer
+```
+
+### From Source
+
+If you prefer to install from the source, follow these steps:
 ```bash
 git clone <repository-url>
 cd rvtools-analyzer
 ```
 Replace `<repository-url>` with the actual URL of the GitHub repository.
 
-### 2. Install Dependencies
 Install the required Python dependencies from the source:
 ```bash
 pip install .
 ```
 This will install the application and its dependencies as specified in `setup.py` and `requirements.txt`.
 
-### 3. Run the Application
+## Run the Application
 Start the Flask application:
 ```bash
 rvtools-analyzer
