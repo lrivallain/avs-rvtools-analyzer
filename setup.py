@@ -1,21 +1,21 @@
 from setuptools import setup, find_packages
+from rvtools_analyzer import __version__ as calver_version
+import os
 
-# Manually set the CalVer version
-calver_version = '2025.4.2'
+# Read requirements from requirements.txt
+def read_requirements():
+    with open(os.path.join(os.path.dirname(__file__), 'requirements.txt')) as f:
+        return f.read().splitlines()
 
 setup(
     name='avs-rvtools-analyzer',
     version=calver_version,
     description='A tool for analyzing RVTools data.',
-    author='Your Name',
-    author_email='your.email@example.com',
+    author='Ludovic Rivallain',
+    author_email='ludovic.rivallain+pip@gmail.com',
     packages=find_packages(),
     include_package_data=True,
-    install_requires=[
-        'flask',
-        'pandas',
-        'openpyxl'
-    ],
+    install_requires=read_requirements(),
     entry_points={
         'console_scripts': [
             'rvtools-analyzer=rvtools_analyzer.main:main'

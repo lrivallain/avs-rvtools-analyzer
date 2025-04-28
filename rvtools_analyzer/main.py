@@ -5,6 +5,8 @@ import pandas as pd
 from flask import jsonify
 import xlrd
 
+from rvtools_analyzer import __version__ as calver_version
+
 app = Flask(__name__)
 
 # Configuration
@@ -225,6 +227,10 @@ def analyze_migration_risks():
         )
 
     return redirect(url_for('index'))
+
+@app.context_processor
+def inject_calver_version():
+    return dict(calver_version=calver_version)
 
 def main():
     """
