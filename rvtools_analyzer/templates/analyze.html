@@ -140,6 +140,42 @@
         </div>
     </a>
     {% endif %}
+
+    {% if vmtools_not_running %}
+    <a href="#vmtools-not-running-card" class="card m-2 text-decoration-none" style="width: 18rem;" title="Click to view more details about VMs without VMware Tools">
+        <div class="card-body">
+            <h5 class="card-title">Powered On VMs without VMware Tools</h5>
+            <p class="card-text">Count: {{ vmtools_not_running | length }}</p>
+        </div>
+        <div class="card-footer">
+            <span class="badge rounded-pill text-bg-warning">Sev: Warning</span>
+        </div>
+    </a>
+    {% endif %}
+
+    {% if high_vcpu_vms %}
+    <a href="#high-vcpu-vms-card" class="card m-2 text-decoration-none" style="width: 18rem;" title="Click to view more details about VMs with high vCPU count">
+        <div class="card-body">
+            <h5 class="card-title">VMs with high vCPU count</h5>
+            <p class="card-text">Count: {{ high_vcpu_vms | length }}</p>
+        </div>
+        <div class="card-footer">
+            <span class="badge rounded-pill text-bg-warning">Sev: Warning</span>
+        </div>
+    </a>
+    {% endif %}
+
+    {% if high_memory_vms %}
+    <a href="#high-memory-vms-card" class="card m-2 text-decoration-none" style="width: 18rem;" title="Click to view more details about VMs with high memory allocation">
+        <div class="card-body">
+            <h5 class="card-title">VMs with high memory allocation</h5>
+            <p class="card-text">Count: {{ high_memory_vms | length }}</p>
+        </div>
+        <div class="card-footer">
+            <span class="badge rounded-pill text-bg-warning">Sev: Warning</span>
+        </div>
+    </a>
+    {% endif %}
 </div>
 {% endif %}
 
@@ -275,7 +311,7 @@
 
 <script>
     const switchCtx = document.getElementById('switchUsageChart').getContext('2d');
-    const switchData = {{ switch_statistics | tojson }};
+    const switchData = JSON.parse('{{ switch_statistics | tojson | safe }}');
 
     const switchLabels = Object.keys(switchData);
     const switchCounts = Object.values(switchData);
@@ -735,7 +771,7 @@
 
 <script>
     const ctx = document.getElementById('esxVersionChart').getContext('2d');
-    const esxVersionData = {{ esx_version_data | tojson }};
+    const esxVersionData = JSON.parse('{{ esx_version_data | tojson | safe }}');
 
     const labels = Object.keys(esxVersionData);
     const data = Object.values(esxVersionData);
@@ -856,6 +892,89 @@
         });
     }
 </script>
+
+{% if high_vcpu_vms %}
+    <div class="card mb-4" id="high-vcpu-vms-card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h2>VMs with high vCPU count</h2>
+        </div>
+        <div class="card-body">
+            <p>The following VMs have a vCPU count higher than the core count of available SKUs.</p>
+            <div class="alert alert-primary" role="alert">
+                <i class="fa-solid fa-circle-info"></i>
+                The VMs with more vCPUs configured than the available SKUs core count will not be able to run on the target hosts.
+            </div>
+            <p>Ensure to review the configurations for optimization.</p>
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>VM</th>
+                        <th>vCPU Count</th>
+                        {% for sku in high_vcpu_vms[0].keys() if sku != 'VM' and sku != 'vCPU Count' %}
+                        <th>{{ sku }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for vm in high_vcpu_vms %}
+                    <tr>
+                        <td>{{ vm.VM }}</td>
+                        <td>{{ vm['vCPU Count'] }}</td>
+                        {% for sku, status in vm.items() if sku != 'VM' and sku != 'vCPU Count' %}
+                        <td>{% if status == '✘' %}<span class="text-danger">{{ status }}</span>{% else %}<span class="text-success">{{ status }}</span>{% endif %}</td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="card-footer">
+            <span class="badge rounded-pill text-bg-danger">Sev: Blocking</span>
+        </div>
+    </div>
+    {% endif %}
+
+{% if high_memory_vms %}
+    <div class="card mb-4" id="high-memory-vms-card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h2>VMs with high memory allocation</h2>
+        </div>
+        <div class="card-body">
+            <p>The following VMs have memory usage exceeding the capabilities of available SKUs.</p>
+            <div class="alert alert-primary" role="alert">
+                <i class="fa-solid fa-circle-info"></i>
+                The VMs with more memory configured than the available capacity per node will not be able to run on the target hosts.
+                <br><br>
+                For performance best practices, it is also recommended not to exceed half of the available memory per node on a single VM.
+            </div>
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>VM</th>
+                        <th>Memory (GB)</th>
+                        {% for sku in high_memory_vms[0].keys() if sku != 'VM' and sku != 'Memory (GB)' %}
+                        <th>{{ sku }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for vm in high_memory_vms %}
+                    <tr>
+                        <td>{{ vm.VM }}</td>
+                        <td>{{ vm['Memory (GB)'] }}</td>
+                        {% for sku, status in vm.items() if sku != 'VM' and sku != 'Memory (GB)' %}
+                        <td>{% if status == '✘' %}<span class="text-danger">{{ status }}</span>{% elif status == '⚠️' %}<span class="text-warning">{{ status }}</span>{% else %}<span class="text-success">{{ status }}</span>{% endif %}</td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="card-footer">
+            <span class="badge rounded-pill text-bg-danger">Sev: Blocking</span>
+        </div>
+    </div>
+    {% endif %}
 
 </div>
 {% endblock %}

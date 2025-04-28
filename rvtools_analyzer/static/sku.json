@@ -1,0 +1,27 @@
+[
+    {
+        "name": "AV36",
+        "cores": 36,
+        "ram": 576
+    },
+    {
+        "name": "AV36P",
+        "cores": 36,
+        "ram": 768
+    },
+    {
+        "name": "AV52",
+        "cores": 52,
+        "ram": 1536
+    },
+    {
+        "name": "AV64",
+        "cores": 64,
+        "ram": 1024
+    },
+    {
+        "name": "AV48",
+        "cores": 48,
+        "ram": 1024
+    }
+]

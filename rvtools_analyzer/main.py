@@ -83,6 +83,8 @@ def analyze_migration_risks():
         vmtools_not_running = []
         cdrom_issues = []
         large_provisioned_vms = []
+        high_vcpu_vms = []
+        high_memory_vms = []
         counts = {
             'esx_version_count': 0,
             'vusb_count': 0,
@@ -149,6 +151,25 @@ def analyze_migration_risks():
             large_provisioned_vms = vinfo_data[vinfo_data['Provisioned TB'] > 10][['VM', 'Provisioned MiB', 'In Use MiB', 'CPUs', 'Memory']].to_dict(orient='records')
             counts['large_provisioned_vms_count'] = len(large_provisioned_vms)
 
+            vinfo_data['CPUs'] = pd.to_numeric(vinfo_data['CPUs'], errors='coerce')
+
+            # Load SKU data
+            import json
+            with open('rvtools_analyzer/static/sku.json') as f:
+                sku_data = json.load(f)
+
+            sku_cores = {sku['name']: sku['cores'] for sku in sku_data}
+
+            for _, vm in vinfo_data.iterrows():
+                if vm['CPUs'] > min(sku_cores.values()):
+                    if not any(existing_vm['VM'] == vm['VM'] for existing_vm in high_vcpu_vms):
+                        high_vcpu_vms.append({
+                            'VM': vm['VM'],
+                            'vCPU Count': vm['CPUs'],
+                            **{sku: '✘' if vm['CPUs'] > cores else '✓' for sku, cores in sku_cores.items()}
+                        })
+
+
         if 'dvPort' in excel_data.sheet_names:
             dvport_data = excel_data.parse('dvPort')
             dvport_data['VLAN'] = dvport_data['VLAN'].fillna(0).astype(int)
@@ -159,6 +180,18 @@ def analyze_migration_risks():
             vcd_data = excel_data.parse('vCD')
             cdrom_issues = vcd_data[(vcd_data['Connected'] == True)][['VM', 'Powerstate', 'Connected', 'Starts Connected', 'Device Type']].to_dict(orient='records')
             counts['cdrom_issues_count'] = len(cdrom_issues)
+
+        for _, vm in vinfo_data.iterrows():
+            if vm['Memory'] > min(sku['ram'] * 1024 for sku in sku_data):
+                if not any(existing_vm['VM'] == vm['VM'] for existing_vm in high_memory_vms):
+                    high_memory_vms.append({
+                        'VM': vm['VM'],
+                        'Memory (GB)': round(vm['Memory']/ 1024,2),
+                        **{
+                            sku['name']: '✘' if vm['Memory'] > sku['ram'] * 1024 else ('⚠️' if vm['Memory'] > (sku['ram'] * 1024) / 2 else '✓')
+                            for sku in sku_data
+                        }
+                    })
 
         return render_template(
             'analyze.html',
@@ -175,6 +208,8 @@ def analyze_migration_risks():
             vmtools_not_running=vmtools_not_running,
             cdrom_issues=cdrom_issues,
             large_provisioned_vms=large_provisioned_vms,
+            high_vcpu_vms=high_vcpu_vms,
+            high_memory_vms=high_memory_vms,
             counts=counts,
         )
 

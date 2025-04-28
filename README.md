@@ -16,6 +16,8 @@ AVS RVTools Analyzer is a Flask-based application for analyzing RVTools data. It
   - Mounted CD/DVD drives
   - Oracle VMs
   - Large provisioned disks
+  - VMs with high vCPU count
+  - VMs with high memory allocation
 
 
 ## Installation
