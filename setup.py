@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 # Manually set the CalVer version
-calver_version = '2025.4.1'
+calver_version = '2025.4.2'
 
 setup(
     name='avs-rvtools-analyzer',
