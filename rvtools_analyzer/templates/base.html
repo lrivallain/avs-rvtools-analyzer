@@ -35,6 +35,31 @@
             width: 100% !important;
             max-height: 500px;
         }
+
+        @media print {
+            .container {
+                width: 100%;
+                margin: 25px;
+                padding: 0;
+            }
+            .card {
+                page-break-inside: avoid;
+            }
+            .d-flex {
+                flex-wrap: wrap;
+                justify-content: space-between;
+            }
+            .btn, .navbar {
+                display: none; /* Hide buttons during print */
+            }
+            .badge, .card-header, .card-footer {
+                -webkit-print-color-adjust: exact; /* Ensure colors are printed */
+                print-color-adjust: exact; /* Standard property for compatibility */
+            }
+            h1, .lead {
+                color:#121212;
+            }
+        }
     </style>
 </head>
 <body>

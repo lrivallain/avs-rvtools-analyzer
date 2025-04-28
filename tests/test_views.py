@@ -35,3 +35,13 @@ def test_analyze_view_with_fake_data(client, fake_excel_data):
     assert b'vUSB Devices' in response.data
     assert b'Risky Disks' in response.data
     assert b'Non-Intel Hosts' in response.data
+
+def test_analyze_view_with_all_risks(client, fake_excel_data):
+    response = client.post('/analyze', data={'file': (fake_excel_data, 'test.xlsx')})
+    assert response.status_code == 200
+    assert b'Migration Risks Analysis' in response.data
+
+    # Check for all risk categories
+    assert b'vUSB Devices' in response.data
+    assert b'Risky Disks' in response.data
+    assert b'ESX Versions' in response.data

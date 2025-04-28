@@ -3,6 +3,7 @@ import os
 from werkzeug.utils import secure_filename
 import pandas as pd
 from flask import jsonify
+import xlrd
 
 app = Flask(__name__)
 
@@ -40,8 +41,11 @@ def allowed_file(filename):
 def index():
     return render_template('index.html')
 
-@app.route('/explore', methods=['POST'])
+@app.route('/explore', methods=['POST', 'GET'])
 def explore_file():
+    if request.method != 'POST':
+        return render_template('error.html', message="Invalid request method. Please use the correct form to submit your file.")
+
     if 'file' not in request.files:
         return redirect(url_for('index'))
 
@@ -60,8 +64,11 @@ def explore_file():
 
     return redirect(url_for('index'))
 
-@app.route('/analyze', methods=['POST'])
+@app.route('/analyze', methods=['POST', 'GET'])
 def analyze_migration_risks():
+    if request.method != 'POST':
+        return render_template('error.html', message="Invalid request method. Please use the correct form to submit your file.")
+
     if 'file' not in request.files:
         return redirect(url_for('index'))
 
@@ -70,7 +77,11 @@ def analyze_migration_risks():
         return redirect(url_for('index'))
 
     if file and allowed_file(file.filename):
-        excel_data = pd.ExcelFile(file)
+        try:
+            excel_data = pd.ExcelFile(file)
+        except xlrd.biffh.XLRDError:
+            return render_template('error.html', message="The uploaded file is protected. Please unprotect the file and try again.")
+
         esx_version_counts = {}
         vusb_devices = []
         risky_disks = []
@@ -134,6 +145,7 @@ def analyze_migration_risks():
 
         if 'vInfo' in excel_data.sheet_names:
             vinfo_data = excel_data.parse('vInfo')
+
             suspended_vms = vinfo_data[vinfo_data['Powerstate'] == 'Suspended'][['VM']].to_dict(orient='records')
             counts['suspended_vms_count'] = len(suspended_vms)
 
@@ -169,6 +181,17 @@ def analyze_migration_risks():
                             **{sku: '✘' if vm['CPUs'] > cores else '✓' for sku, cores in sku_cores.items()}
                         })
 
+            for _, vm in vinfo_data.iterrows():
+                if vm['Memory'] > min(sku['ram'] * 1024 for sku in sku_data):
+                    if not any(existing_vm['VM'] == vm['VM'] for existing_vm in high_memory_vms):
+                        high_memory_vms.append({
+                            'VM': vm['VM'],
+                            'Memory (GB)': round(vm['Memory']/ 1024,2),
+                            **{
+                                sku['name']: '✘' if vm['Memory'] > sku['ram'] * 1024 else ('⚠️' if vm['Memory'] > (sku['ram'] * 1024) / 2 else '✓')
+                                for sku in sku_data
+                            }
+                        })
 
         if 'dvPort' in excel_data.sheet_names:
             dvport_data = excel_data.parse('dvPort')
@@ -180,18 +203,6 @@ def analyze_migration_risks():
             vcd_data = excel_data.parse('vCD')
             cdrom_issues = vcd_data[(vcd_data['Connected'] == True)][['VM', 'Powerstate', 'Connected', 'Starts Connected', 'Device Type']].to_dict(orient='records')
             counts['cdrom_issues_count'] = len(cdrom_issues)
-
-        for _, vm in vinfo_data.iterrows():
-            if vm['Memory'] > min(sku['ram'] * 1024 for sku in sku_data):
-                if not any(existing_vm['VM'] == vm['VM'] for existing_vm in high_memory_vms):
-                    high_memory_vms.append({
-                        'VM': vm['VM'],
-                        'Memory (GB)': round(vm['Memory']/ 1024,2),
-                        **{
-                            sku['name']: '✘' if vm['Memory'] > sku['ram'] * 1024 else ('⚠️' if vm['Memory'] > (sku['ram'] * 1024) / 2 else '✓')
-                            for sku in sku_data
-                        }
-                    })
 
         return render_template(
             'analyze.html',
