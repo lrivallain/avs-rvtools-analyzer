@@ -124,7 +124,7 @@
             <p class="card-text">Count: {{ counts.esx_version_count }}</p>
         </div>
         <div class="card-footer">
-            <span class="badge rounded-pill text-bg-info">Sev: Info</span>
+            <span class="badge rounded-pill text-bg-{{ esx_version_card_risk }}">Sev: {% if esx_version_card_risk == 'danger' %}Blocking{% elif esx_version_card_risk == 'warning' %}Warning{% else %}Info{% endif %}</span>
         </div>
     </a>
     {% endif %}
@@ -747,7 +747,7 @@
 
 {% if counts.esx_version_count > 1 %}
 <div class="card mb-4" id="esx-version-card">
-    <div class="card-header">
+    <div class="card-header d-flex justify-content-between align-items-center">
         <h2>ESX Version Distribution</h2>
         <button class="btn btn-primary" data-id="esx-version-table" onclick="downloadTableAsCSV(this)">Download CSV</button>
     </div>
@@ -758,14 +758,51 @@
             <i class="fa-solid fa-circle-info"></i>
             Having multiple ESX versions in the environment can lead to compatibility issues and increased complexity
             during migration.
+            <br><br>
             It's recommended to standardize on a single ESX version if possible.
+            <br>
+            <ul>
+                <li>Versions lower than {{ WARNING_ESXI_VERSION_THRESHOLD }}: <span class="badge rounded-pill text-bg-warning">Warning</span></li>
+                <li>Versions lower than {{ ERROR_ESXI_VERSION_THRESHOLD }}: <span class="badge rounded-pill text-bg-danger">Blocking</span></li>
+            </ul>
         </div>
         <div class="chart-container" style="position: relative; height:40vh; width:80vw">
             <canvas id="esxVersionChart"></canvas>
         </div>
+
+        <table class="table table-striped" id="esx-version-table">
+            <thead>
+                <tr>
+                    <th>ESX Version</th>
+                    <th>Count</th>
+                    <th>Risk Level</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for version, count in esx_version_data.items() %}
+                <tr>
+                    <td>{{ version }}</td>
+                    <td>{{ count }}</td>
+                    <td>
+                        {% if version in esx_version_risks %}
+                            {% if esx_version_risks[version] == "blocking" %}
+                                <span class="badge rounded-pill text-bg-danger">Blocking</span>
+                            {% elif esx_version_risks[version] == "warning" %}
+                                <span class="badge rounded-pill text-bg-warning">Warning</span>
+                            {% else %}
+                                <span class="badge rounded-pill text-bg-info">Info</span>
+                            {% endif %}
+                        {% else %}
+                            <span class="badge rounded-pill text-bg-success">None</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
     <div class="card-footer">
-        <span class="badge rounded-pill text-bg-info">Sev: Info</span>
+        <span class="badge rounded-pill text-bg-{{ esx_version_card_risk }}">Sev: {% if esx_version_card_risk == 'danger' %}Blocking{% elif esx_version_card_risk == 'warning' %}Warning{% else %}Info{% endif %}</span>
     </div>
 </div>
 
@@ -827,71 +864,6 @@
     });
 </script>
 {% endif %}
-
-<script>
-    function downloadCSV(filename, jsonData) {
-        const data = JSON.parse(jsonData);
-        if (!data || data.length === 0) {
-            alert('No data available to download.');
-            return;
-        }
-
-        const csvContent = [
-            Object.keys(data[0]).join(','),
-            ...data.map(row => Object.values(row).map(value => `"${value}"`).join(','))
-        ].join('\n');
-
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = `${filename}.csv`;
-        link.click();
-    }
-
-    function downloadTableAsCSV(button) {
-        const tableId = button.getAttribute('data-id');
-        const table = document.getElementById(tableId);
-        if (!table) {
-            alert('Table not found.');
-            return;
-        }
-
-        const rows = Array.from(table.querySelectorAll('tr'));
-        const csvContent = rows.map(row => {
-            const cells = Array.from(row.querySelectorAll('th, td'));
-            return cells.map(cell => `"${cell.textContent.trim()}"`).join(',');
-        }).join('\n');
-
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = `${tableId}.csv`;
-        link.click();
-    }
-
-    function filterCards(severity) {
-        const cards = document.querySelectorAll('.card');
-        const summarySections = document.querySelectorAll('.accordion-item');
-
-        cards.forEach(card => {
-            const badge = card.querySelector('.badge');
-            if (card.id === 'summary-card' || severity === 'all' || (badge && badge.textContent.toLowerCase().includes(severity))) {
-                card.style.display = '';
-            } else {
-                card.style.display = 'none';
-            }
-        });
-
-        summarySections.forEach(section => {
-            const badge = section.querySelector('.badge');
-            if (severity === 'all' || (badge && badge.textContent.toLowerCase().includes(severity))) {
-                section.style.display = '';
-            } else {
-                section.style.display = 'none';
-            }
-        });
-    }
-</script>
 
 {% if high_vcpu_vms %}
     <div class="card mb-4" id="high-vcpu-vms-card">
@@ -975,6 +947,71 @@
         </div>
     </div>
     {% endif %}
-
 </div>
+
+<script>
+    function downloadCSV(filename, jsonData) {
+        const data = JSON.parse(jsonData);
+        if (!data || data.length === 0) {
+            alert('No data available to download.');
+            return;
+        }
+
+        const csvContent = [
+            Object.keys(data[0]).join(','),
+            ...data.map(row => Object.values(row).map(value => `"${value}"`).join(','))
+        ].join('\n');
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `${filename}.csv`;
+        link.click();
+    }
+
+    function downloadTableAsCSV(button) {
+        const tableId = button.getAttribute('data-id');
+        const table = document.getElementById(tableId);
+        if (!table) {
+            alert('Table not found.');
+            return;
+        }
+
+        const rows = Array.from(table.querySelectorAll('tr'));
+        const csvContent = rows.map(row => {
+            const cells = Array.from(row.querySelectorAll('th, td'));
+            return cells.map(cell => `"${cell.textContent.trim()}"`).join(',');
+        }).join('\n');
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `${tableId}.csv`;
+        link.click();
+    }
+
+    function filterCards(severity) {
+        const cards = document.querySelectorAll('.card');
+        const summarySections = document.querySelectorAll('.accordion-item');
+
+        cards.forEach(card => {
+            const badge = card.querySelector('.badge');
+            if (card.id === 'summary-card' || severity === 'all' || (badge && badge.textContent.toLowerCase().includes(severity))) {
+                card.style.display = '';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+
+        summarySections.forEach(section => {
+            const badge = section.querySelector('.badge');
+            if (severity === 'all' || (badge && badge.textContent.toLowerCase().includes(severity))) {
+                section.style.display = '';
+            } else {
+                section.style.display = 'none';
+            }
+        });
+    }
+</script>
+
 {% endblock %}

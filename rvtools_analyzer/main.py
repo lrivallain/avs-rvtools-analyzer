@@ -12,6 +12,8 @@ app = Flask(__name__)
 # Configuration
 UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'xlsx'}
+WARNING_ESXI_VERSION_THRESHOLD = '7.0.0' # Version lower than this is considered a warning
+ERROR_ESXI_VERSION_THRESHOLD = '6.5.0' # Version lower than this is considered an error
 
 def convert_mib_to_human_readable(value):
     """
@@ -85,6 +87,8 @@ def analyze_migration_risks():
             return render_template('error.html', message="The uploaded file is protected. Please unprotect the file and try again.")
 
         esx_version_counts = {}
+        esx_version_risks = {}  # For storing version risk levels
+        esx_version_card_risk = "info"  # Default risk level
         vusb_devices = []
         risky_disks = []
         switch_statistics = {}
@@ -117,6 +121,24 @@ def analyze_migration_risks():
             vhost_data = excel_data.parse('vHost')
             esx_version_counts = vhost_data['ESX Version'].value_counts().to_dict()
             counts['esx_version_count'] = len(esx_version_counts)
+
+            # Process and evaluate ESX versions for risk levels
+            import re
+            for version_str in esx_version_counts.keys():
+                # Extract version number from string like "VMware ESXi 6.5.0 build-20502893"
+                version_match = re.search(r'ESXi (\d+\.\d+\.\d+)', version_str)
+                if version_match:
+                    version_num = version_match.group(1)
+                    # Check if version is lower than thresholds and assign risk
+                    if version_num < ERROR_ESXI_VERSION_THRESHOLD:
+                        esx_version_risks[version_str] = "blocking"
+                        esx_version_card_risk = "danger"  # Set card risk to highest level
+                    elif version_num < WARNING_ESXI_VERSION_THRESHOLD:
+                        esx_version_risks[version_str] = "warning"
+                        if esx_version_card_risk != "danger":
+                            esx_version_card_risk = "warning"
+                    else:
+                        esx_version_risks[version_str] = "info"
 
             non_intel_hosts = vhost_data[~vhost_data['CPU Model'].str.contains('Intel', na=False)][['Host', 'Datacenter', 'Cluster', 'CPU Model', '# VMs']].to_dict(orient='records')
             counts['non_intel_hosts_count'] = len(non_intel_hosts)
@@ -210,6 +232,10 @@ def analyze_migration_risks():
             'analyze.html',
             filename=file.filename,
             esx_version_data=esx_version_counts,
+            esx_version_risks=esx_version_risks,
+            esx_version_card_risk=esx_version_card_risk,
+            WARNING_ESXI_VERSION_THRESHOLD=WARNING_ESXI_VERSION_THRESHOLD,
+            ERROR_ESXI_VERSION_THRESHOLD=ERROR_ESXI_VERSION_THRESHOLD,
             vusb_devices=vusb_devices,
             risky_disks=risky_disks,
             switch_statistics=switch_statistics,
