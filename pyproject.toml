@@ -6,6 +6,7 @@ build-backend = "hatchling.build"
 name = "avs-rvtools-analyzer"
 version = "2025.8.0"
 description = "A tool for analyzing RVTools data."
+readme = "README.md"
 authors = [{ name = "Ludovic Rivallain", email = "ludovic.rivallain+pip@gmail.com" }]
 requires-python = ">=3.12"
 dependencies = [
