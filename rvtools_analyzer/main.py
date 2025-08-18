@@ -262,7 +262,16 @@ def main():
     """
     Entry point for the rvtools-analyzer command.
     """
-    app.run(debug=True)
+    # Configuration from environment variables
+    debug = os.getenv('FLASK_DEBUG', '0') == '1'
+    host = os.getenv('FLASK_HOST', '127.0.0.1')
+    port = int(os.getenv('FLASK_PORT', '5000'))
+
+    print(f"Starting RVTools Analyzer v{calver_version}")
+    print(f"Server running on http://{host}:{port}")
+    print("Press CTRL+C to quit")
+
+    app.run(debug=debug, host=host, port=port)
 
 if __name__ == '__main__':
     main()

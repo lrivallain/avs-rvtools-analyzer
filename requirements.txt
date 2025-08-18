@@ -1,4 +1,0 @@
-flask
-pandas
-openpyxl
-xlrd
