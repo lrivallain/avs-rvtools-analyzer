@@ -42,7 +42,7 @@ The fastest way to run the application is using uv's tool runner:
 uv tool run avs-rvtools-analyzer
 
 # Or run from source (current development version)
-uv run rvtools-analyzer
+uv run avs-rvtools-analyzer
 ```
 
 ### Development Setup
@@ -55,12 +55,12 @@ git clone <repository-url>
 cd rvtools-analyzer
 
 # Install dependencies and run in development mode
-uv sync --dev
-uv run rvtools-analyzer
+uv sync --extra dev
+uv run avs-rvtools-analyzer
 
 # Or activate the virtual environment
 uv shell
-rvtools-analyzer
+avs-rvtools-analyzer
 ```
 
 ### Traditional Installation Methods
@@ -97,14 +97,14 @@ pip install .
 
 ```bash
 # Install development dependencies
-uv sync --dev
+uv sync --extra dev
 
 # Run the application in development mode
-uv run rvtools-analyzer
+uv run avs-rvtools-analyzer
 
 # Or activate the shell and run commands
 uv shell
-rvtools-analyzer
+avs-rvtools-analyzer
 ```
 
 ### Code Quality Tools
@@ -157,7 +157,7 @@ uv publish
 Once installed, start the Flask application:
 
 ```bash
-rvtools-analyzer
+avs-rvtools-analyzer
 ```
 
 By default, the application will run on `http://127.0.0.1:5000`. Open this URL in your web browser to access the application.
@@ -174,10 +174,10 @@ You can configure the application using environment variables:
 Example:
 ```bash
 # Using uv
-FLASK_DEBUG=1 FLASK_PORT=8080 uv run rvtools-analyzer
+FLASK_DEBUG=1 FLASK_PORT=8080 uv run avs-rvtools-analyzer
 
 # If installed as a tool
-FLASK_DEBUG=1 FLASK_PORT=8080 rvtools-analyzer
+FLASK_DEBUG=1 FLASK_PORT=8080 avs-rvtools-analyzer
 ```
 
 ## Project Structure
