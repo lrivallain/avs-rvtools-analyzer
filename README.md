@@ -52,7 +52,7 @@ If you want to work on the code or contribute to the project:
 ```bash
 # Clone the repository
 git clone <repository-url>
-cd rvtools-analyzer
+cd avs-rvtools-analyzer
 
 # Install dependencies and run in development mode
 uv sync --extra dev
@@ -81,7 +81,7 @@ pip install avs-rvtools-analyzer
 
 ```bash
 git clone <repository-url>
-cd rvtools-analyzer
+cd avs-rvtools-analyzer
 
 # Using uv (recommended)
 uv build
