@@ -2,16 +2,201 @@
 
 {% block content %}
 <div class="container">
-    <h1 class="text-center">RVTools Analyzer</h1>
-    <form method="post" enctype="multipart/form-data" class="mt-4">
-        <div class="mb-3">
-            <label for="file" class="form-label">Upload RVTools Excel File</label>
-            <input class="form-control" type="file" id="file" name="file" accept=".xlsx">
+    <h1 class="text-center">🚀 AVS RVTools Analyzer</h1>
+    <p class="text-center lead">Analyze RVTools data for Azure VMware Solution migration risks and insights</p>
+
+    <!-- File Upload Section -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3><i class="fas fa-upload"></i> Upload RVTools File</h3>
         </div>
-        <div class="d-flex justify-content-between">
-            <button formaction="/explore" type="submit" class="btn btn-primary">Explore File Content</button>
-            <button formaction="/analyze" type="submit" class="btn btn-warning">Analyze Migration Risks</button>
+        <div class="card-body">
+            <form method="post" enctype="multipart/form-data" class="mt-2">
+                <div class="mb-3">
+                    <label for="file" class="form-label">Upload RVTools Excel File (.xlsx)</label>
+                    <input class="form-control" type="file" id="file" name="file" accept=".xlsx" required>
+                    <div class="form-text">Select an RVTools export file to analyze migration risks and explore data.</div>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <button formaction="/explore" type="submit" class="btn btn-primary">
+                        <i class="fas fa-search"></i> Explore File Content
+                    </button>
+                    <button formaction="/analyze" type="submit" class="btn btn-warning">
+                        <i class="fas fa-exclamation-triangle"></i> Analyze Migration Risks
+                    </button>
+                </div>
+            </form>
         </div>
-    </form>
+    </div>
+
+    {% if api_info %}
+    <!-- API Information Section -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3><i class="fas fa-code"></i> API & Developer Information</h3>
+        </div>
+        <div class="card-body">
+            <p>This server provides both a web interface and RESTful API endpoints for programmatic access.</p>
+
+            <div class="row">
+                <!-- Documentation Links -->
+                <div class="col-md-6">
+                    <h5><i class="fas fa-book"></i> API Documentation</h5>
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>Interactive API Docs (Swagger)</span>
+                            <a href="{{ api_info.endpoints.api_docs }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-external-link-alt"></i> Open
+                            </a>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>Alternative Docs (ReDoc)</span>
+                            <a href="{{ api_info.endpoints.redoc }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-external-link-alt"></i> Open
+                            </a>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>OpenAPI JSON Schema</span>
+                            <a href="{{ api_info.endpoints.openapi_json }}" target="_blank" class="btn btn-sm btn-outline-secondary">
+                                <i class="fas fa-download"></i> Download
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- API Endpoints -->
+                <div class="col-md-6">
+                    <h5><i class="fas fa-cogs"></i> API Endpoints</h5>
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>Health Check</span>
+                            <a href="{{ api_info.endpoints.health }}" target="_blank" class="btn btn-sm btn-outline-success">
+                                <i class="fas fa-heartbeat"></i> Check
+                            </a>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>Available Tools</span>
+                            <a href="{{ api_info.endpoints.tools_list }}" target="_blank" class="btn btn-sm btn-outline-info">
+                                <i class="fas fa-tools"></i> View
+                            </a>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>Server Information</span>
+                            <a href="{{ api_info.endpoints.api_info }}" target="_blank" class="btn btn-sm btn-outline-info">
+                                <i class="fas fa-info-circle"></i> View
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            {% if api_info %}
+            <!-- MCP Server Information -->
+            <div class="mt-4">
+                <h5><i class="fas fa-cogs text-success"></i> MCP Server Configuration</h5>
+                <p class="mb-2">For AI tool integration, use this server as an MCP endpoint. The OpenAPI specification is available
+                    at:</p>
+                <div class="input-group">
+                    <input type="text" class="form-control font-monospace" id="openapi-path"
+                        value="{{ api_info.endpoints.openapi_json }}" readonly>
+                    <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard()">
+                        <i class="fas fa-copy"></i> Copy
+                    </button>
+                </div>
+                <div class="form-text">
+                    <strong>Usage:</strong> Configure your AI assistant or MCP client to use this URL as the OpenAPI schema endpoint
+                    for automatic tool discovery.
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Quick API Usage -->
+            <div class="mt-4">
+                <h5><i class="fas fa-terminal"></i> Quick API Usage</h5>
+                <div class="accordion" id="apiExamples">
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="curlExample">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCurl">
+                                <i class="fas fa-code"></i>&nbsp; cURL Example
+                            </button>
+                        </h2>
+                        <div id="collapseCurl" class="accordion-collapse collapse" data-bs-parent="#apiExamples">
+                            <div class="accordion-body">
+                                <pre><code># Upload and analyze an RVTools file
+curl -X POST "{{ api_info.endpoints.api_docs | replace('/docs', '/api/analyze-upload') }}" \
+     -H "accept: application/json" \
+     -H "Content-Type: multipart/form-data" \
+     -F "file=@your-rvtools-export.xlsx" \
+     -F "include_details=false"</code></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Features Section -->
+    <div class="card">
+        <div class="card-header">
+            <h3><i class="fas fa-star"></i> Features & Capabilities</h3>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-3">
+                    <h5><i class="fas fa-search text-primary"></i> Data Exploration</h5>
+                    <p>Browse and explore all sheets and data from your RVTools export files with an intuitive interface.</p>
+                </div>
+                <div class="col-md-3">
+                    <h5><i class="fas fa-exclamation-triangle text-warning"></i> Risk Analysis</h5>
+                    <p>Automatically detect migration risks, compatibility issues, and optimization opportunities for VMware environments.</p>
+                </div>
+                <div class="col-md-3">
+                    <h5><i class="fas fa-robot text-success"></i> AI Tool Integration</h5>
+                    <p>Works as a <strong>Model Context Protocol (MCP)</strong> server, enabling AI assistants and tools to analyze RVTools data programmatically.</p>
+                </div>
+                <div class="col-md-3">
+                    <h5><i class="fas fa-code text-info"></i> RESTful API</h5>
+                    <p>Full REST API access for automation and integration with your DevOps workflows and monitoring tools.</p>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
+
+<!-- Include Bootstrap JS for accordion functionality -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+function copyToClipboard() {
+    const input = document.getElementById('openapi-path');
+    input.select();
+    input.setSelectionRange(0, 99999); // For mobile devices
+
+    try {
+        document.execCommand('copy');
+
+        // Visual feedback
+        const button = event.target.closest('button');
+        const originalText = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-check"></i> Copied!';
+        button.classList.remove('btn-outline-secondary');
+        button.classList.add('btn-success');
+
+        setTimeout(() => {
+            button.innerHTML = originalText;
+            button.classList.remove('btn-success');
+            button.classList.add('btn-outline-secondary');
+        }, 2000);
+    } catch (err) {
+        // Fallback for browsers that don't support execCommand
+        navigator.clipboard.writeText(input.value).then(() => {
+            alert('URL copied to clipboard!');
+        }).catch(() => {
+            alert('Failed to copy. Please select and copy manually.');
+        });
+    }
+}
+</script>
 {% endblock %}

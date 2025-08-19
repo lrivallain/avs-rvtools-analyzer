@@ -1,277 +1,418 @@
-from flask import Flask, render_template, request, redirect, url_for
+"""
+MCP Server for RVTools Analyzer with integrated web UI.
+Exposes RVTools analysis capabilities through Model Context Protocol and web interface.
+"""
+import asyncio
+import json
+import tempfile
 import os
-from werkzeug.utils import secure_filename
-import pandas as pd
-from flask import jsonify
+from pathlib import Path
+from typing import Any, Dict, List
+from contextlib import asynccontextmanager
+import numpy as np
 import xlrd
 
-from avs_rvtools_analyzer import __version__ as calver_version
+import pandas as pd
+from mcp.server import NotificationOptions, Server
+from mcp.types import (
+    Resource,
+    Tool,
+    TextContent,
+    ImageContent,
+    EmbeddedResource,
+    LoggingLevel
+)
+import uvicorn
+from fastapi import FastAPI, HTTPException, File, UploadFile, Form, Request
+from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import Optional
 
-app = Flask(__name__)
+from .risk_detection import gather_all_risks, get_available_risks
+from .utils import convert_mib_to_human_readable, register_jinja_helpers, allowed_file, get_risk_badge_class, get_risk_display_name
+from . import __version__ as calver_version
 
-# Configuration
-UPLOAD_FOLDER = 'uploads'
-ALLOWED_EXTENSIONS = {'xlsx'}
-WARNING_ESXI_VERSION_THRESHOLD = '7.0.0' # Version lower than this is considered a warning
-ERROR_ESXI_VERSION_THRESHOLD = '6.5.0' # Version lower than this is considered an error
 
-def convert_mib_to_human_readable(value):
-    """
-    Convert MiB to human-readable format (MB, GB, TB).
-    :param value: Value in MiB
-    :return: Human-readable string
-    """
-    try:
-        value = float(value)
-        # 1 MiB = 1.048576 MB
-        value_in_mb = value * 1.048576
+# Request/Response models
+class AnalyzeFileRequest(BaseModel):
+    file_path: str
+    include_details: Optional[bool] = False
 
-        if value_in_mb >= 1024 * 1024:
-            return f"{value_in_mb / (1024 * 1024):.2f} TB"
-        elif value_in_mb >= 1024:
-            return f"{value_in_mb / 1024:.2f} GB"
+class RVToolsAnalyzeServer:
+    """HTTP/MCP API Server for AVS RVTools analysis capabilities with integrated web UI."""
+
+    def __init__(self):
+        self.temp_files = []  # Track temporary files for cleanup
+
+        # Get the directory where this file is located
+        self.base_dir = Path(__file__).parent
+        self.templates_dir = self.base_dir / "templates"
+        self.static_dir = self.base_dir / "static"
+
+    def _clean_nan_values(self, obj):
+        """Recursively clean NaN values from nested dictionaries and lists."""
+        if isinstance(obj, dict):
+            return {key: self._clean_nan_values(value) for key, value in obj.items()}
+        elif isinstance(obj, list):
+            return [self._clean_nan_values(item) for item in obj]
+        elif isinstance(obj, float) and (np.isnan(obj) or np.isinf(obj)):
+            return None
+        elif pd.isna(obj):
+            return None
         else:
-            return f"{value_in_mb:.2f} MB"
-    except (ValueError, TypeError):
-        return "Invalid input"
+            return obj
 
-# Register the function for Jinja2 templating
-app.jinja_env.filters['convert_mib_to_human_readable'] = convert_mib_to_human_readable
+    async def run(self, host: str = "127.0.0.1", port: int = 8000):
+        """Run the HTTP/MCP API server with integrated web UI."""
 
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
-@app.route('/')
-def index():
-    return render_template('index.html')
-
-@app.route('/explore', methods=['POST', 'GET'])
-def explore_file():
-    if request.method != 'POST':
-        return render_template('error.html', message="Invalid request method. Please use the correct form to submit your file.")
-
-    if 'file' not in request.files:
-        return redirect(url_for('index'))
-
-    file = request.files['file']
-    if file.filename == '':
-        return redirect(url_for('index'))
-
-    if file and allowed_file(file.filename):
-        # Parse the uploaded file directly without saving
-        excel_data = pd.ExcelFile(file)
-        sheets = {}
-        for sheet_name in excel_data.sheet_names:
-            sheets[sheet_name] = excel_data.parse(sheet_name).to_dict(orient='records')
-
-        return render_template('explore.html', sheets=sheets, filename=file.filename)
-
-    return redirect(url_for('index'))
-
-@app.route('/analyze', methods=['POST', 'GET'])
-def analyze_migration_risks():
-    if request.method != 'POST':
-        return render_template('error.html', message="Invalid request method. Please use the correct form to submit your file.")
-
-    if 'file' not in request.files:
-        return redirect(url_for('index'))
-
-    file = request.files['file']
-    if file.filename == '':
-        return redirect(url_for('index'))
-
-    if file and allowed_file(file.filename):
-        try:
-            excel_data = pd.ExcelFile(file)
-        except xlrd.biffh.XLRDError:
-            return render_template('error.html', message="The uploaded file is protected. Please unprotect the file and try again.")
-
-        esx_version_counts = {}
-        esx_version_risks = {}  # For storing version risk levels
-        esx_version_card_risk = "info"  # Default risk level
-        vusb_devices = []
-        risky_disks = []
-        switch_statistics = {}
-        vsnapshot_data = []
-        suspended_vms = []
-        oracle_vms = []
-        dvport_issues = []
-        non_intel_hosts = []
-        vmtools_not_running = []
-        cdrom_issues = []
-        large_provisioned_vms = []
-        high_vcpu_vms = []
-        high_memory_vms = []
-        counts = {
-            'esx_version_count': 0,
-            'vusb_count': 0,
-            'risky_disks_count': 0,
-            'vsnapshot_count': 0,
-            'non_dvs_switch_count': 0,
-            'suspended_vms_count': 0,
-            'oracle_vms_count': 0,
-            'dvport_issues_count': 0,
-            'non_intel_hosts_count': 0,
-            'vmtools_not_running_count': 0,
-            'cdrom_issues_count': 0,
-            'large_provisioned_vms_count': 0
-        }
-
-        if 'vHost' in excel_data.sheet_names:
-            vhost_data = excel_data.parse('vHost')
-            esx_version_counts = vhost_data['ESX Version'].value_counts().to_dict()
-            counts['esx_version_count'] = len(esx_version_counts)
-
-            # Process and evaluate ESX versions for risk levels
-            import re
-            for version_str in esx_version_counts.keys():
-                # Extract version number from string like "VMware ESXi 6.5.0 build-20502893"
-                version_match = re.search(r'ESXi (\d+\.\d+\.\d+)', version_str)
-                if version_match:
-                    version_num = version_match.group(1)
-                    # Check if version is lower than thresholds and assign risk
-                    if version_num < ERROR_ESXI_VERSION_THRESHOLD:
-                        esx_version_risks[version_str] = "blocking"
-                        esx_version_card_risk = "danger"  # Set card risk to highest level
-                    elif version_num < WARNING_ESXI_VERSION_THRESHOLD:
-                        esx_version_risks[version_str] = "warning"
-                        if esx_version_card_risk != "danger":
-                            esx_version_card_risk = "warning"
-                    else:
-                        esx_version_risks[version_str] = "info"
-
-            non_intel_hosts = vhost_data[~vhost_data['CPU Model'].str.contains('Intel', na=False)][['Host', 'Datacenter', 'Cluster', 'CPU Model', '# VMs']].to_dict(orient='records')
-            counts['non_intel_hosts_count'] = len(non_intel_hosts)
-
-        if 'vUSB' in excel_data.sheet_names:
-            vusb_data = excel_data.parse('vUSB')
-            vusb_devices = vusb_data[['VM', 'Powerstate', 'Device Type', 'Connected']].to_dict(orient='records')
-            counts['vusb_count'] = len(vusb_devices)
-
-        if 'vDisk' in excel_data.sheet_names:
-            vdisk_data = excel_data.parse('vDisk')
-            risky_disks = vdisk_data[(vdisk_data['Raw'] == True) | (vdisk_data['Disk Mode'] == 'independent_persistent')][['VM', 'Powerstate', 'Disk', 'Capacity MiB', 'Raw', 'Disk Mode']].to_dict(orient='records')
-            counts['risky_disks_count'] = len(risky_disks)
-
-        if 'dvSwitch' in excel_data.sheet_names and 'vNetwork' in excel_data.sheet_names:
-            dvswitch_data = excel_data.parse('dvSwitch')
-            vnetwork_data = excel_data.parse('vNetwork')
-
-            dvswitch_list = dvswitch_data['Switch'].dropna().unique()
-            vnetwork_data['Switch Type'] = vnetwork_data['Switch'].apply(lambda x: 'standard vSwitch' if x not in dvswitch_list else x)
-            switch_statistics = vnetwork_data['Switch Type'].value_counts().to_dict()
-            counts['non_dvs_switch_count'] = len(vnetwork_data[vnetwork_data['Switch Type'] == 'standard vSwitch'])
-
-        if 'vSnapshot' in excel_data.sheet_names:
-            vsnapshot_sheet = excel_data.parse('vSnapshot')
-            vsnapshot_data = vsnapshot_sheet[['VM', 'Powerstate', 'Name', 'Date / time', 'Size MiB (vmsn)', 'Description']].to_dict(orient='records')
-            counts['vsnapshot_count'] = len(vsnapshot_data)
-
-        if 'vInfo' in excel_data.sheet_names:
-            vinfo_data = excel_data.parse('vInfo')
-
-            suspended_vms = vinfo_data[vinfo_data['Powerstate'] == 'Suspended'][['VM']].to_dict(orient='records')
-            counts['suspended_vms_count'] = len(suspended_vms)
-
-            oracle_vms = vinfo_data[vinfo_data['OS according to the VMware Tools'].str.contains('Oracle', na=False)][['VM', 'OS according to the VMware Tools', 'Powerstate', 'CPUs', 'Memory', 'Provisioned MiB', 'In Use MiB']].to_dict(orient='records')
-            counts['oracle_vms_count'] = len(oracle_vms)
-
-            vmtools_not_running = vinfo_data[(vinfo_data['Powerstate'] == 'poweredOn') & (vinfo_data['Guest state'] == 'notRunning')][['VM', 'Powerstate', 'Guest state', 'OS according to the configuration file']].to_dict(orient='records')
-            counts['vmtools_not_running_count'] = len(vmtools_not_running)
-
-            # Ensure 'Provisioned MiB' and 'In Use MiB' are numeric
-            vinfo_data['Provisioned MiB'] = pd.to_numeric(vinfo_data['Provisioned MiB'], errors='coerce')
-            vinfo_data['In Use MiB'] = pd.to_numeric(vinfo_data['In Use MiB'], errors='coerce')
-
-            vinfo_data['Provisioned TB'] = (pd.to_numeric(vinfo_data['Provisioned MiB'], errors='coerce') * 1.048576) / (1024 * 1024)
-            large_provisioned_vms = vinfo_data[vinfo_data['Provisioned TB'] > 10][['VM', 'Provisioned MiB', 'In Use MiB', 'CPUs', 'Memory']].to_dict(orient='records')
-            counts['large_provisioned_vms_count'] = len(large_provisioned_vms)
-
-            vinfo_data['CPUs'] = pd.to_numeric(vinfo_data['CPUs'], errors='coerce')
-
-            # Load SKU data
-            import json
-            with open('avs_rvtools_analyzer/static/sku.json') as f:
-                sku_data = json.load(f)
-
-            sku_cores = {sku['name']: sku['cores'] for sku in sku_data}
-
-            for _, vm in vinfo_data.iterrows():
-                if vm['CPUs'] > min(sku_cores.values()):
-                    if not any(existing_vm['VM'] == vm['VM'] for existing_vm in high_vcpu_vms):
-                        high_vcpu_vms.append({
-                            'VM': vm['VM'],
-                            'vCPU Count': vm['CPUs'],
-                            **{sku: '✘' if vm['CPUs'] > cores else '✓' for sku, cores in sku_cores.items()}
-                        })
-
-            for _, vm in vinfo_data.iterrows():
-                if vm['Memory'] > min(sku['ram'] * 1024 for sku in sku_data):
-                    if not any(existing_vm['VM'] == vm['VM'] for existing_vm in high_memory_vms):
-                        high_memory_vms.append({
-                            'VM': vm['VM'],
-                            'Memory (GB)': round(vm['Memory']/ 1024,2),
-                            **{
-                                sku['name']: '✘' if vm['Memory'] > sku['ram'] * 1024 else ('⚠️' if vm['Memory'] > (sku['ram'] * 1024) / 2 else '✓')
-                                for sku in sku_data
-                            }
-                        })
-
-        if 'dvPort' in excel_data.sheet_names:
-            dvport_data = excel_data.parse('dvPort')
-            dvport_data['VLAN'] = dvport_data['VLAN'].fillna(0).astype(int)
-            dvport_issues = dvport_data[(dvport_data['VLAN'].isnull()) | (dvport_data['Allow Promiscuous'] == True) | (dvport_data['Mac Changes'] == True) | (dvport_data['Forged Transmits'] == True)][['Port', 'Switch', 'Object ID', 'VLAN', 'Allow Promiscuous', 'Mac Changes', 'Forged Transmits']].to_dict(orient='records')
-            counts['dvport_issues_count'] = len(dvport_issues)
-
-        if 'vCD' in excel_data.sheet_names:
-            vcd_data = excel_data.parse('vCD')
-            cdrom_issues = vcd_data[(vcd_data['Connected'] == True)][['VM', 'Powerstate', 'Connected', 'Starts Connected', 'Device Type']].to_dict(orient='records')
-            counts['cdrom_issues_count'] = len(cdrom_issues)
-
-        return render_template(
-            'analyze.html',
-            filename=file.filename,
-            esx_version_data=esx_version_counts,
-            esx_version_risks=esx_version_risks,
-            esx_version_card_risk=esx_version_card_risk,
-            WARNING_ESXI_VERSION_THRESHOLD=WARNING_ESXI_VERSION_THRESHOLD,
-            ERROR_ESXI_VERSION_THRESHOLD=ERROR_ESXI_VERSION_THRESHOLD,
-            vusb_devices=vusb_devices,
-            risky_disks=risky_disks,
-            switch_statistics=switch_statistics,
-            vsnapshot_data=vsnapshot_data,
-            suspended_vms=suspended_vms,
-            oracle_vms=oracle_vms,
-            dvport_issues=dvport_issues,
-            non_intel_hosts=non_intel_hosts,
-            vmtools_not_running=vmtools_not_running,
-            cdrom_issues=cdrom_issues,
-            large_provisioned_vms=large_provisioned_vms,
-            high_vcpu_vms=high_vcpu_vms,
-            high_memory_vms=high_memory_vms,
-            counts=counts,
+        # Create FastAPI app with enhanced metadata
+        app = FastAPI(
+            title="AVS RVTools Analyzer",
+            version=calver_version,
+            description="A comprehensive tool for analyzing RVTools data with both web interface and RESTful API. Supports Model Context Protocol (MCP) for AI tool integration.",
+            tags_metadata=[
+                {
+                    "name": "Web UI",
+                    "description": "Web-based user interface for uploading, exploring, and analyzing RVTools files through an interactive dashboard."
+                },
+                {
+                    "name": "API",
+                    "description": "RESTful API endpoints for programmatic access, automation, and AI tool integration via Model Context Protocol (MCP)."
+                }
+            ]
         )
 
-    return redirect(url_for('index'))
+        # Setup Jinja2 templates
+        templates = Jinja2Templates(directory=str(self.templates_dir))
 
-@app.context_processor
-def inject_calver_version():
-    return dict(calver_version=calver_version)
+        # Setup static files if they exist
+        if self.static_dir.exists():
+            app.mount("/static", StaticFiles(directory=str(self.static_dir)), name="static")
+
+        # Add CORS middleware
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+
+        # Register Jinja2 helpers (we need to adapt this for FastAPI)
+        # Add custom filters to Jinja2 environment
+        templates.env.filters['convert_mib_to_human_readable'] = convert_mib_to_human_readable
+        templates.env.globals['calver_version'] = calver_version
+        templates.env.globals['get_risk_badge_class'] = get_risk_badge_class
+        templates.env.globals['get_risk_display_name'] = get_risk_display_name
+
+        # Web UI Routes
+        @app.get("/", response_class=HTMLResponse, tags=["Web UI"], summary="Landing Page", description="Main web interface for RVTools analysis")
+        async def index(request: Request):
+            # Enhanced landing page with API links
+            return templates.TemplateResponse("index.html", {
+                "request": request,
+                "api_info": {
+                    "host": host,
+                    "port": port,
+                    "endpoints": {
+                        "health": f"http://{host}:{port}/health",
+                        "api_docs": f"http://{host}:{port}/docs",
+                        "redoc": f"http://{host}:{port}/redoc",
+                        "openapi_json": f"http://{host}:{port}/openapi.json",
+                        "tools_list": f"http://{host}:{port}/tools",
+                        "api_info": f"http://{host}:{port}/api/info"
+                    }
+                }
+            })
+
+        @app.post("/explore", response_class=HTMLResponse, tags=["Web UI"], summary="Explore RVTools File", description="Upload and explore RVTools Excel file contents")
+        async def explore_file(request: Request, file: UploadFile = File(...)):
+            if not file.filename:
+                return templates.TemplateResponse("error.html", {
+                    "request": request,
+                    "message": "No file selected"
+                })
+
+            if not allowed_file(file.filename, {'xlsx'}):
+                return templates.TemplateResponse("error.html", {
+                    "request": request,
+                    "message": "Invalid file format. Please upload an Excel file (.xlsx)"
+                })
+
+            try:
+                # Read file content
+                content = await file.read()
+
+                # Create temporary file
+                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx')
+                temp_file.write(content)
+                temp_file.close()
+
+                # Parse the Excel file
+                excel_data = pd.ExcelFile(temp_file.name)
+                sheets = {}
+                for sheet_name in excel_data.sheet_names:
+                    sheets[sheet_name] = excel_data.parse(sheet_name).to_dict(orient='records')
+
+                # Clean up temp file
+                os.unlink(temp_file.name)
+
+                return templates.TemplateResponse("explore.html", {
+                    "request": request,
+                    "sheets": sheets,
+                    "filename": file.filename
+                })
+
+            except Exception as e:
+                return templates.TemplateResponse("error.html", {
+                    "request": request,
+                    "message": f"Error processing file: {str(e)}"
+                })
+
+        @app.post("/analyze", response_class=HTMLResponse, tags=["Web UI"], summary="Analyze Migration Risks", description="Upload and analyze RVTools file for migration risks and compatibility issues")
+        async def analyze_migration_risks(request: Request, file: UploadFile = File(...)):
+            if not file.filename:
+                return templates.TemplateResponse("error.html", {
+                    "request": request,
+                    "message": "No file selected"
+                })
+
+            if not allowed_file(file.filename, {'xlsx'}):
+                return templates.TemplateResponse("error.html", {
+                    "request": request,
+                    "message": "Invalid file format. Please upload an Excel file (.xlsx)"
+                })
+
+            try:
+                # Read file content
+                content = await file.read()
+
+                # Create temporary file
+                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx')
+                temp_file.write(content)
+                temp_file.close()
+
+                try:
+                    excel_data = pd.ExcelFile(temp_file.name)
+                except xlrd.biffh.XLRDError:
+                    os.unlink(temp_file.name)
+                    return templates.TemplateResponse("error.html", {
+                        "request": request,
+                        "message": "The uploaded file is protected. Please unprotect the file and try again."
+                    })
+
+                # Use the risk detection module
+                risk_results = gather_all_risks(excel_data)
+
+                # Clean up temp file
+                os.unlink(temp_file.name)
+
+                return templates.TemplateResponse("analyze.html", {
+                    "request": request,
+                    "filename": file.filename,
+                    "risk_results": risk_results,
+                })
+
+            except Exception as e:
+                return templates.TemplateResponse("error.html", {
+                    "request": request,
+                    "message": f"Error analyzing file: {str(e)}"
+                })
+
+        # API Routes (keep existing API functionality)
+        @app.get("/api/info", tags=["API"], summary="Server Information", description="Get server information and available endpoints")
+        async def api_info():
+            return {
+                "name": "AVS RVTools Analyzer",
+                "version": calver_version,
+                "description": "HTTP / MCP API for RVTools analysis capabilities",
+                "endpoints": {
+                    "web_ui": "/",
+                    "analyze": "/api/analyze",
+                    "analyze_upload": "/api/analyze-upload",
+                    "available_risks": "/api/risks",
+                    "health": "/health",
+                    "tools": "/tools"
+                }
+            }
+
+        @app.get("/health", tags=["API"], summary="Health Check", description="Check server health status")
+        async def health():
+            return {
+                "status": "healthy",
+                "server": "avs-rvtools-analyzer",
+                "version": calver_version
+            }
+
+        @app.get("/tools", tags=["API"], summary="Available Tools", description="List available MCP tools and their capabilities")
+        async def list_tools():
+            return {
+                "tools": [
+                    {
+                        "name": "analyze_rvtools_file",
+                        "description": "Analyze RVTools Excel files for migration risks (file path)",
+                        "endpoint": "/api/analyze"
+                    },
+                    {
+                        "name": "analyze_uploaded_rvtools_file",
+                        "description": "Analyze uploaded RVTools Excel files for migration risks (file upload)",
+                        "endpoint": "/api/analyze-upload"
+                    },
+                    {
+                        "name": "list_available_risks",
+                        "description": "Get information about all migration risks that can be assessed",
+                        "endpoint": "/api/risks"
+                    }
+                ]
+            }
+
+        @app.get("/api/risks", tags=["API"], summary="Available Risk Assessments", description="List all migration risks that can be assessed by this tool")
+        async def list_available_risks():
+            """Get information about all available risk detection capabilities."""
+            try:
+                risks_info = get_available_risks()
+                return {
+                    "success": True,
+                    "data": risks_info,
+                    "message": f"Found {risks_info['total_available_risks']} available risk assessments"
+                }
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Error retrieving risk information: {str(e)}")
+
+        @app.post("/api/analyze", tags=["API"], summary="Analyze RVTools File (Path)", description="Analyze RVTools file by providing a file path on the server")
+        async def analyze_file(request: AnalyzeFileRequest):
+            """Analyze RVTools file endpoint."""
+            try:
+                result = await self._analyze_file({
+                    "file_path": request.file_path,
+                    "include_details": request.include_details
+                })
+                return {"success": True, "data": result}
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=str(e))
+
+        @app.post("/api/analyze-upload", tags=["API"], summary="Analyze RVTools File (Upload)", description="Upload and analyze RVTools Excel file for migration risks and compatibility issues")
+        async def analyze_uploaded_file(
+            file: UploadFile = File(...),
+            include_details: bool = Form(False)
+        ):
+            """Analyze uploaded RVTools file endpoint."""
+            try:
+                # Validate file type
+                if not file.filename.endswith(('.xlsx', '.xls')):
+                    raise HTTPException(status_code=400, detail="File must be an Excel file (.xlsx or .xls)")
+
+                # Save uploaded file to temporary location
+                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx')
+                content = await file.read()
+                temp_file.write(content)
+                temp_file.close()
+
+                # Track temp file for cleanup
+                self.temp_files.append(temp_file.name)
+
+                # Analyze the file
+                result = await self._analyze_file({
+                    "file_path": temp_file.name,
+                    "include_details": include_details
+                })
+
+                # Clean up temp file
+                try:
+                    os.unlink(temp_file.name)
+                    self.temp_files.remove(temp_file.name)
+                except:
+                    pass
+
+                return {"success": True, "data": result}
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=str(e))
+
+        print(f"🚀 AVS RVTools Analyzer server starting on http://{host}:{port}")
+        print(f"  🌐 Web UI: http://{host}:{port}")
+        print(f"  📊 API docs: http://{host}:{port}/docs")
+        print(f"  💊 Health check: http://{host}:{port}/health")
+        print(f"  🔧 Tools list: http://{host}:{port}/tools")
+        print(f"  📄 OpenAPI JSON: http://{host}:{port}/openapi.json")
+
+        # Run the FastAPI server
+        config = uvicorn.Config(app, host=host, port=port, log_level="info")
+        server = uvicorn.Server(config)
+        await server.serve()
+
+    async def _analyze_file(self, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        """Analyze RVTools file."""
+        file_path = arguments.get("file_path")
+        include_details = arguments.get("include_details", False)
+
+        if not file_path or not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail=f"File not found at {file_path}")
+
+        try:
+            # Load Excel file
+            excel_data = pd.ExcelFile(file_path)
+
+            # Perform risk analysis
+            risk_results = gather_all_risks(excel_data)
+
+            # Clean NaN values from the results
+            cleaned_results = self._clean_nan_values(risk_results)
+
+            # Filter out risks with count = 0
+            filtered_risks = {
+                risk_name: risk_data
+                for risk_name, risk_data in cleaned_results["risks"].items()
+                if risk_data.get("count", 0) > 0
+            }
+
+            # Update the cleaned results with filtered risks
+            cleaned_results["risks"] = filtered_risks
+
+            # Format results
+            if include_details:
+                return cleaned_results
+            else:
+                # Simplified summary without raw data
+                summary = {
+                    "summary": cleaned_results["summary"],
+                    "risks": {}
+                }
+
+                for risk_name, risk_data in cleaned_results["risks"].items():
+                    summary["risks"][risk_name] = {
+                        "count": risk_data["count"],
+                        "risk_level": risk_data.get("risk_level", "info"),
+                        "risk_info": risk_data.get("risk_info", {}),
+                        "has_data": len(risk_data.get("data", [])) > 0
+                    }
+
+                return summary
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error analyzing file: {str(e)}")
+
+
+async def server_main():
+    """Main entry point for the MCP server."""
+    import argparse
+
+    parser = argparse.ArgumentParser(description="AVS RVTools Analyzer")
+    parser.add_argument("--host", default="127.0.0.1", help="Host to bind to (default: 127.0.0.1)")
+    parser.add_argument("--port", type=int, default=8000, help="Port to bind to (default: 8000)")
+
+    args = parser.parse_args()
+
+    server = RVToolsAnalyzeServer()
+    await server.run(host=args.host, port=args.port)
+
 
 def main():
-    """
-    Entry point for the rvtools-analyzer command.
-    """
-    # Configuration from environment variables
-    debug = os.getenv('FLASK_DEBUG', '0') == '1'
-    host = os.getenv('FLASK_HOST', '127.0.0.1')
-    port = int(os.getenv('FLASK_PORT', '5000'))
+    """Entry point that can be called directly."""
+    asyncio.run(server_main())
 
-    print(f"Starting RVTools Analyzer v{calver_version}")
-    print(f"Server running on http://{host}:{port}")
-    print("Press CTRL+C to quit")
 
-    app.run(debug=debug, host=host, port=port)
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
