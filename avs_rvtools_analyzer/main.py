@@ -5,7 +5,7 @@ import pandas as pd
 from flask import jsonify
 import xlrd
 
-from rvtools_analyzer import __version__ as calver_version
+from avs_rvtools_analyzer import __version__ as calver_version
 
 app = Flask(__name__)
 
@@ -191,7 +191,7 @@ def analyze_migration_risks():
 
             # Load SKU data
             import json
-            with open('rvtools_analyzer/static/sku.json') as f:
+            with open('avs_rvtools_analyzer/static/sku.json') as f:
                 sku_data = json.load(f)
 
             sku_cores = {sku['name']: sku['cores'] for sku in sku_data}

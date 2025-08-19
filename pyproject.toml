@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [project.scripts]
-avs-rvtools-analyzer = "rvtools_analyzer.main:main"
+avs-rvtools-analyzer = "avs_rvtools_analyzer.main:main"
 
 [project.optional-dependencies]
 dev = [
@@ -30,4 +30,4 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["rvtools_analyzer"]
+packages = ["avs_rvtools_analyzer"]

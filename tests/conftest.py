@@ -1,5 +1,5 @@
 import pytest
-from rvtools_analyzer.main import app
+from avs_rvtools_analyzer.main import app
 import pandas as pd
 from io import BytesIO
 
