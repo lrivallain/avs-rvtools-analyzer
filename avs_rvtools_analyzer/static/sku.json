@@ -13,7 +13,7 @@
         "vsan_cache_capacity_in_tb": 3.2,
         "vsan_cache_storage_technology": "NVMe",
         "vsan_capacity_tier_in_tb": 15.20,
-        "vsan_capacity_tier_storage_technology": "HDD"
+        "vsan_capacity_tier_storage_technology": "SSD"
     },
     {
         "name": "AV36P",

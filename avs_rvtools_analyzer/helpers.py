@@ -14,7 +14,7 @@ def load_sku_data() -> List[Dict]:
     Load SKU data from JSON file with caching.
 
     Returns:
-        List of SKU dictionaries containing name, cores, and ram information
+        List of SKU dictionaries as defined in sku.json
 
     Raises:
         FileNotFoundError: If the SKU data file is not found
