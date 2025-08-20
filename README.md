@@ -157,7 +157,7 @@ uv run avs-rvtools-analyzer --host 0.0.0.0 --port 9000
 
 ### MCP Tools for AI Integration
 
-The application exposes three MCP tools for AI assistants:
+The application exposes MCP tools for AI assistants:
 
 1. **`analyze_rvtools_file`**: Analyze uploaded RVTools files
 2. **`get_available_risks`**: List all supported risk categories
