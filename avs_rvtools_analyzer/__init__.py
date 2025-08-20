@@ -1,5 +1,5 @@
 # This file marks the avs_rvtools_analyzer directory as a Python package.
-__version__ = '2025.8.2'
+__version__ = '2025.8.3'
 
 # For uv tool execution
 def main():

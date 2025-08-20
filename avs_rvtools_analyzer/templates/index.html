@@ -94,17 +94,17 @@
             <!-- MCP Server Information -->
             <div class="mt-4">
                 <h5><i class="fas fa-cogs text-success"></i> MCP Server Configuration</h5>
-                <p class="mb-2">For AI tool integration, use this server as an MCP endpoint. The OpenAPI specification is available
+                <p class="mb-2">For AI tool integration, use this server as an MCP endpoint. The MCP server is available
                     at:</p>
                 <div class="input-group">
                     <input type="text" class="form-control font-monospace" id="openapi-path"
-                        value="{{ api_info.endpoints.openapi_json }}" readonly>
+                        value="{{ api_info.endpoints.mcp_api }}" readonly>
                     <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard()">
                         <i class="fas fa-copy"></i> Copy
                     </button>
                 </div>
                 <div class="form-text">
-                    <strong>Usage:</strong> Configure your AI assistant or MCP client to use this URL as the OpenAPI schema endpoint
+                    <strong>Usage:</strong> Configure your AI assistant or MCP client to use this URL as the MCP endpoint
                     for automatic tool discovery.
                 </div>
             </div>

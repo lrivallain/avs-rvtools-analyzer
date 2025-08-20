@@ -52,7 +52,7 @@ The application provides:
 
 - Web interface: `http://127.0.0.1:8000` (upload and analyze files)
 - API documentation: `http://127.0.0.1:8000/docs` (interactive OpenAPI docs)
-- MCP tools: Available at `/tools` endpoint for AI integration
+- MCP tools: Available at `/mcp` endpoint for AI integration
 
 ### Development Setup
 

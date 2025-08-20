@@ -2,6 +2,31 @@
 Utility functions and Jinja2 helpers for the RVTools Analyzer application.
 """
 
+import logging
+
+# Configure logging with uvicorn-style colored formatter
+class ColoredFormatter(logging.Formatter):
+    """Custom formatter with colored log levels like uvicorn."""
+
+    # ANSI color codes
+    COLORS = {
+        'DEBUG': '\033[36m',      # Cyan
+        'INFO': '\033[32m',       # Green
+        'WARNING': '\033[33m',    # Yellow
+        'ERROR': '\033[31m',      # Red
+        'CRITICAL': '\033[35m',   # Magenta
+        'RESET': '\033[0m'        # Reset
+    }
+
+    def format(self, record):
+        # Get color for log level
+        color = self.COLORS.get(record.levelname, self.COLORS['RESET'])
+        reset = self.COLORS['RESET']
+
+        # Format like uvicorn: "INFO:     message"
+        formatted_level = f"{color}{record.levelname}{reset}:"
+        return f"{formatted_level:<15}    {record.getMessage()}"
+
 def convert_mib_to_human_readable(value):
     """
     Convert MiB to human-readable format (MB, GB, TB).
@@ -50,13 +75,3 @@ def allowed_file(filename, allowed_extensions=None):
     if allowed_extensions is None:
         allowed_extensions = {'xlsx'}
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in allowed_extensions
-
-
-def register_jinja_helpers(app):
-    """Register all Jinja2 filters and global functions with the Flask app."""
-    # Register filters
-    app.jinja_env.filters['convert_mib_to_human_readable'] = convert_mib_to_human_readable
-
-    # Register global functions
-    app.jinja_env.globals['get_risk_badge_class'] = get_risk_badge_class
-    app.jinja_env.globals['get_risk_display_name'] = get_risk_display_name

@@ -13,27 +13,41 @@ import numpy as np
 import xlrd
 
 import pandas as pd
-from mcp.server import NotificationOptions, Server
-from mcp.types import (
-    Resource,
-    Tool,
-    TextContent,
-    ImageContent,
-    EmbeddedResource,
-    LoggingLevel
-)
-import uvicorn
 from fastapi import FastAPI, HTTPException, File, UploadFile, Form, Request
 from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
+from fastmcp import FastMCP
 from pydantic import BaseModel
 from typing import Optional
+import logging
 
 from .risk_detection import gather_all_risks, get_available_risks
-from .utils import convert_mib_to_human_readable, register_jinja_helpers, allowed_file, get_risk_badge_class, get_risk_display_name
+from .helpers import load_sku_data
+from .utils import (
+    convert_mib_to_human_readable,
+    allowed_file,
+    get_risk_badge_class,
+    get_risk_display_name,
+    ColoredFormatter)
 from . import __version__ as calver_version
+
+# Set up logger with custom formatter
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+# Remove existing handlers to avoid duplication
+for handler in logger.handlers[:]:
+    logger.removeHandler(handler)
+
+# Create console handler with custom formatter
+console_handler = logging.StreamHandler()
+console_handler.setFormatter(ColoredFormatter())
+logger.addHandler(console_handler)
+
+# Prevent propagation to avoid duplicate logs
+logger.propagate = False
 
 
 # Request/Response models
@@ -68,6 +82,10 @@ class RVToolsAnalyzeServer:
     async def run(self, host: str = "127.0.0.1", port: int = 8000):
         """Run the HTTP/MCP API server with integrated web UI."""
 
+        # Initialize MCP app
+        mcp = FastMCP("AVS RVTools Analyzer")
+        mcp_app = mcp.http_app(path='/')
+
         # Create FastAPI app with enhanced metadata
         app = FastAPI(
             title="AVS RVTools Analyzer",
@@ -82,8 +100,12 @@ class RVToolsAnalyzeServer:
                     "name": "API",
                     "description": "RESTful API endpoints for programmatic access, automation, and AI tool integration via Model Context Protocol (MCP)."
                 }
-            ]
+            ],
+            lifespan=mcp_app.lifespan
         )
+
+        # Mount MCP app in /mcp FastAPI
+        app.mount("/mcp", mcp_app)
 
         # Setup Jinja2 templates
         templates = Jinja2Templates(directory=str(self.templates_dir))
@@ -112,33 +134,37 @@ class RVToolsAnalyzeServer:
         @app.get("/", response_class=HTMLResponse, tags=["Web UI"], summary="Landing Page", description="Main web interface for RVTools analysis")
         async def index(request: Request):
             # Enhanced landing page with API links
-            return templates.TemplateResponse("index.html", {
-                "request": request,
-                "api_info": {
-                    "host": host,
-                    "port": port,
-                    "endpoints": {
-                        "health": f"http://{host}:{port}/health",
-                        "api_docs": f"http://{host}:{port}/docs",
-                        "redoc": f"http://{host}:{port}/redoc",
-                        "openapi_json": f"http://{host}:{port}/openapi.json",
-                        "tools_list": f"http://{host}:{port}/tools",
-                        "api_info": f"http://{host}:{port}/api/info"
+            return templates.TemplateResponse(request=request,
+                name="index.html",
+                context={
+                    "api_info": {
+                        "host": host,
+                        "port": port,
+                        "endpoints": {
+                            "health": f"http://{host}:{port}/health",
+                            "api_docs": f"http://{host}:{port}/docs",
+                            "redoc": f"http://{host}:{port}/redoc",
+                            "openapi_json": f"http://{host}:{port}/openapi.json",
+                            "tools_list": f"http://{host}:{port}/tools",
+                            "api_info": f"http://{host}:{port}/api/info",
+                            "mcp_api": f"http://{host}:{port}/mcp",
+                        }
                     }
-                }
-            })
+                })
 
         @app.post("/explore", response_class=HTMLResponse, tags=["Web UI"], summary="Explore RVTools File", description="Upload and explore RVTools Excel file contents")
         async def explore_file(request: Request, file: UploadFile = File(...)):
             if not file.filename:
-                return templates.TemplateResponse("error.html", {
-                    "request": request,
+                return templates.TemplateResponse(request=request,
+                name="error.html",
+                context={
                     "message": "No file selected"
                 })
 
             if not allowed_file(file.filename, {'xlsx'}):
-                return templates.TemplateResponse("error.html", {
-                    "request": request,
+                return templates.TemplateResponse(request=request,
+                name="error.html",
+                context={
                     "message": "Invalid file format. Please upload an Excel file (.xlsx)"
                 })
 
@@ -160,31 +186,39 @@ class RVToolsAnalyzeServer:
                 # Clean up temp file
                 os.unlink(temp_file.name)
 
-                return templates.TemplateResponse("explore.html", {
-                    "request": request,
-                    "sheets": sheets,
-                    "filename": file.filename
-                })
+                return templates.TemplateResponse(request=request,
+                    name="explore.html",
+                    context={
+                        "sheets": sheets,
+                        "filename": file.filename
+                    }
+                )
 
             except Exception as e:
-                return templates.TemplateResponse("error.html", {
-                    "request": request,
-                    "message": f"Error processing file: {str(e)}"
-                })
+                return templates.TemplateResponse(request=request,
+                    name="error.html",
+                    context={
+                        "message": f"Error processing file: {str(e)}"
+                    }
+                )
 
         @app.post("/analyze", response_class=HTMLResponse, tags=["Web UI"], summary="Analyze Migration Risks", description="Upload and analyze RVTools file for migration risks and compatibility issues")
         async def analyze_migration_risks(request: Request, file: UploadFile = File(...)):
             if not file.filename:
-                return templates.TemplateResponse("error.html", {
-                    "request": request,
-                    "message": "No file selected"
-                })
+                return templates.TemplateResponse(request=request,
+                    name="error.html",
+                    context={
+                        "message": "No file selected"
+                    }
+                )
 
             if not allowed_file(file.filename, {'xlsx'}):
-                return templates.TemplateResponse("error.html", {
-                    "request": request,
-                    "message": "Invalid file format. Please upload an Excel file (.xlsx)"
-                })
+                return templates.TemplateResponse(request=request,
+                    name="error.html",
+                    context={
+                        "message": "Invalid file format. Please upload an Excel file (.xlsx)"
+                    }
+                )
 
             try:
                 # Read file content
@@ -199,10 +233,12 @@ class RVToolsAnalyzeServer:
                     excel_data = pd.ExcelFile(temp_file.name)
                 except xlrd.biffh.XLRDError:
                     os.unlink(temp_file.name)
-                    return templates.TemplateResponse("error.html", {
-                        "request": request,
-                        "message": "The uploaded file is protected. Please unprotect the file and try again."
-                    })
+                    return templates.TemplateResponse(request=request,
+                        name="error.html",
+                        context={
+                            "message": "The uploaded file is protected. Please unprotect the file and try again."
+                        }
+                    )
 
                 # Use the risk detection module
                 risk_results = gather_all_risks(excel_data)
@@ -210,17 +246,21 @@ class RVToolsAnalyzeServer:
                 # Clean up temp file
                 os.unlink(temp_file.name)
 
-                return templates.TemplateResponse("analyze.html", {
-                    "request": request,
-                    "filename": file.filename,
-                    "risk_results": risk_results,
-                })
+                return templates.TemplateResponse(request=request,
+                    name="analyze.html",
+                    context={
+                        "filename": file.filename,
+                        "risk_results": risk_results,
+                    }
+                )
 
             except Exception as e:
-                return templates.TemplateResponse("error.html", {
-                    "request": request,
-                    "message": f"Error analyzing file: {str(e)}"
-                })
+                return templates.TemplateResponse(request=request,
+                    name="error.html",
+                    context={
+                        "message": f"Error analyzing file: {str(e)}"
+                    }
+                )
 
         # API Routes (keep existing API functionality)
         @app.get("/api/info", tags=["API"], summary="Server Information", description="Get server information and available endpoints")
@@ -234,8 +274,8 @@ class RVToolsAnalyzeServer:
                     "analyze": "/api/analyze",
                     "analyze_upload": "/api/analyze-upload",
                     "available_risks": "/api/risks",
+                    "sku_capabilities": "/api/sku",
                     "health": "/health",
-                    "tools": "/tools"
                 }
             }
 
@@ -247,28 +287,11 @@ class RVToolsAnalyzeServer:
                 "version": calver_version
             }
 
-        @app.get("/tools", tags=["API"], summary="Available Tools", description="List available MCP tools and their capabilities")
-        async def list_tools():
-            return {
-                "tools": [
-                    {
-                        "name": "analyze_rvtools_file",
-                        "description": "Analyze RVTools Excel files for migration risks (file path)",
-                        "endpoint": "/api/analyze"
-                    },
-                    {
-                        "name": "analyze_uploaded_rvtools_file",
-                        "description": "Analyze uploaded RVTools Excel files for migration risks (file upload)",
-                        "endpoint": "/api/analyze-upload"
-                    },
-                    {
-                        "name": "list_available_risks",
-                        "description": "Get information about all migration risks that can be assessed",
-                        "endpoint": "/api/risks"
-                    }
-                ]
-            }
-
+        @mcp.tool(
+            name="list_available_risks",
+            description="List all migration risks that can be assessed by this tool.",
+            tags={"risks", "assessment"}
+        )
         @app.get("/api/risks", tags=["API"], summary="Available Risk Assessments", description="List all migration risks that can be assessed by this tool")
         async def list_available_risks():
             """Get information about all available risk detection capabilities."""
@@ -282,6 +305,26 @@ class RVToolsAnalyzeServer:
             except Exception as e:
                 raise HTTPException(status_code=500, detail=f"Error retrieving risk information: {str(e)}")
 
+        @mcp.tool(
+            name="get_sku_capabilities",
+            description="Get Azure VMware Solution (AVS) SKU hardware capabilities and specifications.",
+            tags={"sku", "hardware", "capabilities"}
+        )
+        @app.get("/api/sku", tags=["API"], summary="AVS SKU Capabilities", description="Get Azure VMware Solution (AVS) SKU hardware capabilities and specifications")
+        async def get_sku_capabilities():
+            """Get AVS SKU hardware capabilities and specifications."""
+            try:
+                return load_sku_data()
+            except FileNotFoundError:
+                raise HTTPException(status_code=404, detail="SKU data file not found")
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Error retrieving SKU information: {str(e)}")
+
+        @mcp.tool(
+            name="analyze_file",
+            description="Analyze RVTools file by providing a file path on the server.",
+            tags={"analysis", "file", "local"}
+        )
         @app.post("/api/analyze", tags=["API"], summary="Analyze RVTools File (Path)", description="Analyze RVTools file by providing a file path on the server")
         async def analyze_file(request: AnalyzeFileRequest):
             """Analyze RVTools file endpoint."""
@@ -294,6 +337,11 @@ class RVToolsAnalyzeServer:
             except Exception as e:
                 raise HTTPException(status_code=400, detail=str(e))
 
+        @mcp.tool(
+            name="analyze_uploaded_file",
+            description="Upload and analyze RVTools Excel file for migration risks and compatibility issues.",
+            tags={"analysis", "upload"}
+        )
         @app.post("/api/analyze-upload", tags=["API"], summary="Analyze RVTools File (Upload)", description="Upload and analyze RVTools Excel file for migration risks and compatibility issues")
         async def analyze_uploaded_file(
             file: UploadFile = File(...),
@@ -324,22 +372,30 @@ class RVToolsAnalyzeServer:
                 try:
                     os.unlink(temp_file.name)
                     self.temp_files.remove(temp_file.name)
-                except:
-                    pass
+                except Exception as e:
+                    logger.debug(f"Error cleaning up temp file {temp_file.name}: {str(e)}")
 
                 return {"success": True, "data": result}
             except Exception as e:
                 raise HTTPException(status_code=400, detail=str(e))
 
-        print(f"🚀 AVS RVTools Analyzer server starting on http://{host}:{port}")
-        print(f"  🌐 Web UI: http://{host}:{port}")
-        print(f"  📊 API docs: http://{host}:{port}/docs")
-        print(f"  💊 Health check: http://{host}:{port}/health")
-        print(f"  🔧 Tools list: http://{host}:{port}/tools")
-        print(f"  📄 OpenAPI JSON: http://{host}:{port}/openapi.json")
+        logger.info(f"🚀 AVS RVTools Analyzer server starting...")
+        logger.info(f"  🌐 Web UI: http://{host}:{port}")
+        logger.info(f"  📊 API docs: http://{host}:{port}/docs")
+        logger.info(f"  💊 Health check: http://{host}:{port}/health")
+        logger.info(f"  📄 OpenAPI JSON: http://{host}:{port}/openapi.json")
+        logger.info(f"  🔗 MCP API: http://{host}:{port}/mcp")
 
         # Run the FastAPI server
-        config = uvicorn.Config(app, host=host, port=port, log_level="info")
+        #app.run(host=host, port=port, log_level="info")
+        import uvicorn
+        config = uvicorn.Config(
+            app,
+            host=host,
+            port=port,
+            log_level="info",
+            timeout_graceful_shutdown=3
+        )
         server = uvicorn.Server(config)
         await server.serve()
 
@@ -411,7 +467,10 @@ async def server_main():
 
 def main():
     """Entry point that can be called directly."""
-    asyncio.run(server_main())
+    try:
+        asyncio.run(server_main())
+    except KeyboardInterrupt:
+        logger.info("Shutting down server.")
 
 
 if __name__ == "__main__":

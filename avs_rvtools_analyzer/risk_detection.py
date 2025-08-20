@@ -3,65 +3,17 @@ Risk detection module for RVTools analysis.
 Contains individual risk detection functions and a gatherer function.
 """
 import re
-import json
-import functools
-from functools import wraps
-from typing import Dict, List, Any, Callable
+from typing import Dict, List, Any
 import pandas as pd
-from pathlib import Path
 
-# Cache SKU data to avoid repeated file reads
-@functools.lru_cache(maxsize=1)
-def _load_sku_data() -> List[Dict]:
-    """
-    Load SKU data from JSON file with caching.
-
-    Returns:
-        List of SKU dictionaries containing name, cores, and ram information
-
-    Raises:
-        FileNotFoundError: If the SKU data file is not found
-    """
-    sku_file_path = Path(__file__).parent / 'static' / 'sku.json'
-    with open(sku_file_path, 'r', encoding='utf-8') as f:
-        return json.load(f)
-
-# Risk level decorator with integrated risk info
-def risk_info(level: str, description: str, alert_message: str = None):
-    """
-    Decorator to assign risk levels and info to detection functions.
-
-    Args:
-        level: Risk level ('info', 'warning', 'danger', 'blocking')
-        description: Description of the risk
-        alert_message: Alert message with recommendations (optional)
-    """
-    def decorator(func: Callable) -> Callable:
-        # Store metadata on the original function
-        func._risk_info = {
-            'level': level,
-            'description': description,
-            'alert_message': alert_message
-        }
-
-        @wraps(func)
-        def wrapper(*args, **kwargs) -> Dict[str, Any]:
-            result = func(*args, **kwargs)
-            if isinstance(result, dict):
-                result['risk_level'] = level
-                result['function_name'] = func.__name__
-                result['risk_info'] = {
-                    'description': description,
-                    'alert_message': alert_message
-                }
-            return result
-
-        # Copy the metadata to the wrapper as well
-        wrapper._risk_info = func._risk_info
-        return wrapper
-    return decorator
-
-
+# Import from our new modules
+from .models import RiskLevel, ESXVersionThresholds, PowerStates, GuestStates, NetworkConstants, StorageConstants
+from .helpers import (
+    load_sku_data, safe_sheet_access, create_empty_result,
+    filter_dataframe_by_condition, get_risk_category, convert_mib_to_tb,
+    clean_function_name_for_display
+)
+from .decorators import risk_info
 ########################################################################################################################
 #                                                                                                                      #
 #                                               Risk Detection Functions                                               #
@@ -69,7 +21,7 @@ def risk_info(level: str, description: str, alert_message: str = None):
 ########################################################################################################################
 
 @risk_info(
-    level='info',
+    level=RiskLevel.INFO,
     description='This shows the distribution of ESX versions found in the uploaded file.',
     alert_message="""Having multiple ESX versions in the environment can lead to compatibility issues and
     increased complexity during migration.<br><br>It's recommended to standardize on a single ESX version
@@ -77,13 +29,10 @@ def risk_info(level: str, description: str, alert_message: str = None):
 )
 def detect_esx_versions(excel_data: pd.ExcelFile) -> Dict[str, Any]:
     """Detect ESX versions and their risk levels."""
-    if 'vHost' not in excel_data.sheet_names:
-        return {'count': 0, 'data': [], 'details': {}}
+    vhost_data = safe_sheet_access(excel_data, 'vHost')
+    if vhost_data is None:
+        return create_empty_result()
 
-    WARNING_THRESHOLD = '7.0.0'
-    ERROR_THRESHOLD = '6.5.0'
-
-    vhost_data = excel_data.parse('vHost')
     version_counts = vhost_data['ESX Version'].value_counts().to_dict()
     version_risks = {}
     card_risk = "info"
@@ -92,10 +41,10 @@ def detect_esx_versions(excel_data: pd.ExcelFile) -> Dict[str, Any]:
         version_match = re.search(r'ESXi (\d+\.\d+\.\d+)', version_str)
         if version_match:
             version_num = version_match.group(1)
-            if version_num < ERROR_THRESHOLD:
+            if version_num < ESXVersionThresholds.ERROR_THRESHOLD:
                 version_risks[version_str] = "blocking"
                 card_risk = "danger"
-            elif version_num < WARNING_THRESHOLD:
+            elif version_num < ESXVersionThresholds.WARNING_THRESHOLD:
                 version_risks[version_str] = "warning"
                 if card_risk != "danger":
                     card_risk = "warning"
@@ -108,14 +57,14 @@ def detect_esx_versions(excel_data: pd.ExcelFile) -> Dict[str, Any]:
         'details': {
             'version_risks': version_risks,
             'card_risk': card_risk,
-            'warning_threshold': WARNING_THRESHOLD,
-            'error_threshold': ERROR_THRESHOLD
+            'warning_threshold': ESXVersionThresholds.WARNING_THRESHOLD,
+            'error_threshold': ESXVersionThresholds.ERROR_THRESHOLD
         }
     }
 
 
 @risk_info(
-    level='blocking',
+    level=RiskLevel.BLOCKING,
     description='vUSB devices are USB devices that are connected to a virtual machine (VM) in a VMware environment.',
     alert_message="""Having vUSB devices connected to VMs can pose a risk during migration, as they cannot be
     transferred to an Azure Managed environment.<br><br>It's recommended to review the list of vUSB devices
@@ -123,10 +72,10 @@ def detect_esx_versions(excel_data: pd.ExcelFile) -> Dict[str, Any]:
 )
 def detect_vusb_devices(excel_data: pd.ExcelFile) -> Dict[str, Any]:
     """Detect USB devices attached to VMs."""
-    if 'vUSB' not in excel_data.sheet_names:
-        return {'count': 0, 'data': []}
+    vusb_data = safe_sheet_access(excel_data, 'vUSB')
+    if vusb_data is None:
+        return create_empty_result()
 
-    vusb_data = excel_data.parse('vUSB')
     devices = vusb_data[['VM', 'Powerstate', 'Device Type', 'Connected']].to_dict(orient='records')
 
     return {
@@ -355,22 +304,22 @@ def detect_cdrom_issues(excel_data: pd.ExcelFile) -> Dict[str, Any]:
 
 
 @risk_info(
-    level='warning',
+    level=RiskLevel.WARNING,
     description='VMs have provisioned storage exceeding 10TB.',
     alert_message="""Large provisioned storage can lead to increased migration times and potential compatibility
     issues. It's recommended to review these VMs and optimize storage usage if possible."""
 )
 def detect_large_provisioned_vms(excel_data: pd.ExcelFile) -> Dict[str, Any]:
     """Detect VMs with large provisioned disks (>10TB)."""
-    if 'vInfo' not in excel_data.sheet_names:
-        return {'count': 0, 'data': []}
+    vm_data = safe_sheet_access(excel_data, 'vInfo')
+    if vm_data is None:
+        return create_empty_result()
 
-    vinfo_data = excel_data.parse('vInfo')
-    vinfo_data['Provisioned MiB'] = pd.to_numeric(vinfo_data['Provisioned MiB'], errors='coerce')
-    vinfo_data['In Use MiB'] = pd.to_numeric(vinfo_data['In Use MiB'], errors='coerce')
-    vinfo_data['Provisioned TB'] = (vinfo_data['Provisioned MiB'] * 1.048576) / (1024 * 1024)
+    vm_data['Provisioned MiB'] = pd.to_numeric(vm_data['Provisioned MiB'], errors='coerce')
+    vm_data['In Use MiB'] = pd.to_numeric(vm_data['In Use MiB'], errors='coerce')
+    vm_data['Provisioned TB'] = (vm_data['Provisioned MiB'] * 1.048576) / (1024 * 1024)
 
-    large_vms = vinfo_data[vinfo_data['Provisioned TB'] > 10][
+    large_vms = vm_data[vm_data['Provisioned TB'] > 10][
         ['VM', 'Provisioned MiB', 'In Use MiB', 'CPUs', 'Memory']
     ].to_dict(orient='records')
 
@@ -381,37 +330,37 @@ def detect_large_provisioned_vms(excel_data: pd.ExcelFile) -> Dict[str, Any]:
 
 
 @risk_info(
-    level='blocking',
+    level=RiskLevel.BLOCKING,
     description='VMs have a vCPU count higher than the core count of available SKUs.',
     alert_message="""The VMs with more vCPUs configured than the available SKUs core count will not be able
     to run on the target hosts."""
 )
 def detect_high_vcpu_vms(excel_data: pd.ExcelFile) -> Dict[str, Any]:
     """Detect VMs with high vCPU count."""
-    if 'vInfo' not in excel_data.sheet_names:
-        return {'count': 0, 'data': []}
+    vm_data = safe_sheet_access(excel_data, 'vInfo')
+    if vm_data is None:
+        return create_empty_result()
 
     # Load SKU data using cached function
     try:
-        sku_data = _load_sku_data()
+        sku_data = load_sku_data()
     except FileNotFoundError:
         return {'count': 0, 'data': [], 'error': 'SKU data file not found'}
 
-    vinfo_data = excel_data.parse('vInfo')
-    vinfo_data['CPUs'] = pd.to_numeric(vinfo_data['CPUs'], errors='coerce')
+    vm_data['CPUs'] = pd.to_numeric(vm_data['CPUs'], errors='coerce')
 
     sku_cores = {sku['name']: sku['cores'] for sku in sku_data}
     min_cores = min(sku_cores.values())
 
     high_vcpu_vms = []
-    for _, vm in vinfo_data.iterrows():
+    for _, vm in vm_data.iterrows():
         if vm['CPUs'] > min_cores:
-            vm_data = {
+            vm_data_entry = {
                 'VM': vm['VM'],
                 'vCPU Count': vm['CPUs'],
                 **{sku: '✘' if vm['CPUs'] > cores else '✓' for sku, cores in sku_cores.items()}
             }
-            high_vcpu_vms.append(vm_data)
+            high_vcpu_vms.append(vm_data_entry)
 
     return {
         'count': len(high_vcpu_vms),
@@ -420,12 +369,45 @@ def detect_high_vcpu_vms(excel_data: pd.ExcelFile) -> Dict[str, Any]:
 
 
 @risk_info(
-    level='blocking',
+    level=RiskLevel.BLOCKING,
     description='VMs have memory usage exceeding the capabilities of available SKUs.',
     alert_message="""The VMs with more memory configured than the available capacity per node will not be able
     to run on the target hosts.<br><br>For performance best practices, it is also recommended not to exceed
     half of the available memory per node on a single VM."""
 )
+def detect_high_memory_vms(excel_data: pd.ExcelFile) -> Dict[str, Any]:
+    """Detect VMs with high memory allocation."""
+    vm_data = safe_sheet_access(excel_data, 'vInfo')
+    if vm_data is None:
+        return create_empty_result()
+
+    # Load SKU data using cached function
+    try:
+        sku_data = load_sku_data()
+    except FileNotFoundError:
+        return {'count': 0, 'data': [], 'error': 'SKU data file not found'}
+
+    vm_data['Memory'] = pd.to_numeric(vm_data['Memory'], errors='coerce')
+
+    min_memory = min(sku['ram'] * 1024 for sku in sku_data)
+
+    high_memory_vms = []
+    for _, vm in vm_data.iterrows():
+        if vm['Memory'] > min_memory:
+            vm_data_entry = {
+                'VM': vm['VM'],
+                'Memory (GB)': round(vm['Memory'] / 1024, 2),
+                **{
+                    sku['name']: '✘' if vm['Memory'] > sku['ram'] * 1024 else '✓'
+                    for sku in sku_data
+                }
+            }
+            high_memory_vms.append(vm_data_entry)
+
+    return {
+        'count': len(high_memory_vms),
+        'data': high_memory_vms
+    }
 def detect_high_memory_vms(excel_data: pd.ExcelFile) -> Dict[str, Any]:
     """Detect VMs with high memory allocation."""
     if 'vInfo' not in excel_data.sheet_names:
@@ -501,15 +483,15 @@ def get_available_risks() -> Dict[str, Any]:
         risk_metadata = getattr(func, '_risk_info', {})
 
         # Clean up the function name for display
-        display_name = func_name.replace('detect_', '').replace('_', ' ').title()
+        # (now using helper function)
 
         available_risks[func_name] = {
             'name': func_name,
-            'display_name': display_name,
+            'display_name': clean_function_name_for_display(func_name),
             'risk_level': risk_metadata.get('level', 'info'),
             'description': risk_metadata.get('description', 'No description available'),
             'alert_message': risk_metadata.get('alert_message', None),
-            'category': _get_risk_category(func_name)
+            'category': get_risk_category(func_name)
         }
 
         # Count risk levels
@@ -522,29 +504,6 @@ def get_available_risks() -> Dict[str, Any]:
         'risk_levels_distribution': risk_levels_count,
         'risks': available_risks
     }
-
-def _get_risk_category(func_name: str) -> str:
-    """
-    Categorize risk detection functions based on their name.
-
-    Args:
-        func_name: Name of the risk detection function
-
-    Returns:
-        Category string
-    """
-    if 'esx' in func_name or 'host' in func_name:
-        return 'Infrastructure'
-    elif 'vm' in func_name or 'memory' in func_name or 'vcpu' in func_name or 'provisioned' in func_name:
-        return 'Virtual Machines'
-    elif 'disk' in func_name or 'cdrom' in func_name or 'snapshot' in func_name:
-        return 'Storage'
-    elif 'switch' in func_name or 'dvport' in func_name:
-        return 'Networking'
-    elif 'usb' in func_name or 'oracle' in func_name or 'vmtools' in func_name:
-        return 'Compatibility'
-    else:
-        return 'General'
 
 def gather_all_risks(excel_data: pd.ExcelFile) -> Dict[str, Any]:
     """
