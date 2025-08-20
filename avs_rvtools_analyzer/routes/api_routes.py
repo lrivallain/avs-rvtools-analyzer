@@ -1,0 +1,198 @@
+"""
+API and MCP routes for AVS RVTools Analyzer.
+Combines both REST API endpoints and MCP tool definitions.
+"""
+from typing import Any, Dict, List
+from pathlib import Path
+from datetime import datetime, UTC
+
+from fastapi import FastAPI, HTTPException, File, UploadFile, Form
+from fastmcp import FastMCP
+from pydantic import BaseModel
+from typing import Optional
+
+from ..services import FileService, AnalysisService, SKUService
+from ..config import AppConfig
+from ..models import (
+    HealthResponse,
+    APIInfoResponse,
+    AnalysisResponse,
+    AvailableRisksResponse,
+    SKUCapabilitiesResponse,
+    RiskTypeInfo,
+    SKUInfo,
+    ErrorResponse
+)
+from .. import __version__ as calver_version
+
+
+class AnalyzeFileRequest(BaseModel):
+    """Request model for file analysis."""
+    file_path: str
+    include_details: Optional[bool] = False
+
+
+def setup_api_routes(
+    app: FastAPI,
+    mcp: FastMCP,
+    config: AppConfig
+) -> None:
+    """Setup API and MCP routes for the FastAPI application."""
+
+    # Initialize services
+    file_service = FileService(config.files)
+    analysis_service = AnalysisService()
+    sku_service = SKUService(config.paths.sku_data_file)
+
+    # API Routes
+    @app.get("/api/info", tags=["API"], summary="Server Information", description="Get server information and available endpoints", response_model=APIInfoResponse)
+    async def api_info():
+        """Get server information and available endpoints."""
+        return APIInfoResponse(
+            name=config.fastapi.title,
+            version=calver_version,
+            description="HTTP / MCP API for RVTools analysis capabilities",
+            documentation_url=f"http://{config.server.host}:{config.server.port}/docs",
+            openapi_url=f"http://{config.server.host}:{config.server.port}/openapi.json",
+            mcp_enabled=True,
+            endpoints={
+                "web_ui": config.endpoints.web_ui,
+                "analyze": config.endpoints.analyze,
+                "analyze_upload": config.endpoints.analyze_upload,
+                "available_risks": config.endpoints.available_risks,
+                "sku_capabilities": config.endpoints.sku_capabilities,
+                "health": config.endpoints.health,
+            }
+        )
+
+    @app.get("/health", tags=["API"], summary="Health Check", description="Check server health status", response_model=HealthResponse)
+    async def health():
+        """Check server health status."""
+        return HealthResponse(
+            status="healthy",
+            timestamp=datetime.now(UTC).isoformat() + "Z",
+            version=calver_version
+        )
+
+    # Combined API/MCP Routes
+    @mcp.tool(
+        name="list_available_risks",
+        description="List all migration risks that can be assessed by this tool.",
+        tags={"risks", "assessment"}
+    )
+    @app.get("/api/risks", tags=["API"], summary="Available Risk Assessments", description="List all migration risks that can be assessed by this tool", response_model=AvailableRisksResponse)
+    async def list_available_risks():
+        """Get information about all available risk detection capabilities."""
+        risks_info = analysis_service.get_available_risk_types()
+
+        # Transform the risks data to match our response model
+        risk_types = []
+        for risk_name, risk_data in risks_info.get("risks", {}).items():
+            risk_types.append(RiskTypeInfo(
+                name=risk_name,
+                function_name=risk_data.get("function_name", risk_name),
+                description=risk_data.get("description", ""),
+                risk_level=risk_data.get("risk_level", "info"),
+                alert_message=risk_data.get("alert_message"),
+                category=risk_data.get("category")
+            ))
+
+        return AvailableRisksResponse(
+            success=True,
+            message=f"Found {len(risk_types)} available risk assessments",
+            total_risks=len(risk_types),
+            risks=risk_types
+        )
+
+    @mcp.tool(
+        name="get_sku_capabilities",
+        description="Get Azure VMware Solution (AVS) SKU hardware capabilities and specifications.",
+        tags={"sku", "hardware", "capabilities"}
+    )
+    @app.get("/api/sku", tags=["API"], summary="AVS SKU Capabilities", description="Get Azure VMware Solution (AVS) SKU hardware capabilities and specifications", response_model=SKUCapabilitiesResponse)
+    async def get_sku_capabilities():
+        """Get AVS SKU hardware capabilities and specifications."""
+        sku_data = sku_service.get_sku_capabilities()
+
+        # Transform SKU data to match our response model
+        skus = []
+        for sku in sku_data:
+            skus.append(SKUInfo(**sku))
+
+        return skus
+
+    @mcp.tool(
+        name="analyze_file",
+        description="Analyze RVTools file by providing a file path on the server.",
+        tags={"analysis", "file", "local"}
+    )
+    @app.post("/api/analyze", tags=["API"], summary="Analyze RVTools File (Path)", description="Analyze RVTools file by providing a file path on the server", response_model=AnalysisResponse)
+    async def analyze_file(request: AnalyzeFileRequest):
+        """Analyze RVTools file by file path."""
+        file_path = Path(request.file_path)
+
+        # Load Excel file
+        excel_data = file_service.load_excel_file(file_path)
+
+        # Validate Excel data
+        analysis_service.validate_excel_data(excel_data)
+
+        # Perform analysis
+        result = analysis_service.analyze_risks(
+            excel_data,
+            include_details=request.include_details,
+            filter_zero_counts=True
+        )
+
+        return AnalysisResponse(
+            success=True,
+            message="Analysis completed successfully",
+            risks=result.get("risks", {}),
+            summary=result.get("summary"),
+            total_risks_found=len([r for r in result.get("risks", {}).values() if r.get("count", 0) > 0]),
+            analysis_timestamp=datetime.now(UTC).isoformat() + "Z"
+        )
+
+    @mcp.tool(
+        name="analyze_uploaded_file",
+        description="Upload and analyze RVTools Excel file for migration risks and compatibility issues.",
+        tags={"analysis", "upload"}
+    )
+    @app.post("/api/analyze-upload", tags=["API"], summary="Analyze RVTools File (Upload)", description="Upload and analyze RVTools Excel file for migration risks and compatibility issues", response_model=AnalysisResponse)
+    async def analyze_uploaded_file(
+        file: UploadFile = File(...),
+        include_details: bool = Form(False)
+    ):
+        """Analyze uploaded RVTools file."""
+        # Validate file
+        file_service.validate_file(file)
+
+        # Save uploaded file
+        temp_file_path = await file_service.save_uploaded_file(file)
+
+        try:
+            # Load Excel file
+            excel_data = file_service.load_excel_file(temp_file_path)
+
+            # Validate Excel data
+            analysis_service.validate_excel_data(excel_data)
+
+            # Perform analysis
+            result = analysis_service.analyze_risks(
+                excel_data,
+                include_details=include_details,
+                filter_zero_counts=True
+            )
+
+            return AnalysisResponse(
+                success=True,
+                message="Analysis completed successfully",
+                risks=result.get("risks", {}),
+                summary=result.get("summary"),
+                total_risks_found=len([r for r in result.get("risks", {}).values() if r.get("count", 0) > 0]),
+                analysis_timestamp=datetime.now(UTC).isoformat() + "Z"
+            )
+
+        finally:
+            # Clean up temp file
+            file_service.cleanup_temp_file(temp_file_path)

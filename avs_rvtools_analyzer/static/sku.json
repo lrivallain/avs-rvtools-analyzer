@@ -2,26 +2,81 @@
     {
         "name": "AV36",
         "cores": 36,
-        "ram": 576
+        "ram": 576,
+        "cpu_model": "Intel Xeon Gold 6140",
+        "cpu_architecture": "Skylake",
+        "cpu_speed_ghz": 2.3,
+        "cpu_turbo_speed_ghz": 3.7,
+        "cpu_number": 2,
+        "logical_threads_with_hyperthreading": 72,
+        "vsan_architecture": "OSA",
+        "vsan_cache_capacity_in_tb": 3.2,
+        "vsan_cache_storage_technology": "NVMe",
+        "vsan_capacity_tier_in_tb": 15.20,
+        "vsan_capacity_tier_storage_technology": "SSD"
     },
     {
         "name": "AV36P",
         "cores": 36,
-        "ram": 768
+        "ram": 768,
+        "cpu_model": "Intel Xeon Gold 6240",
+        "cpu_architecture": "Cascade Lake",
+        "cpu_speed_ghz": 2.6,
+        "cpu_turbo_speed_ghz": 3.9,
+        "cpu_number": 2,
+        "logical_threads_with_hyperthreading": 72,
+        "vsan_architecture": "OSA",
+        "vsan_cache_capacity_in_tb": 1.5,
+        "vsan_cache_storage_technology": "Intel cache",
+        "vsan_capacity_tier_in_tb": 19.2,
+        "vsan_capacity_tier_storage_technology": "NVMe"
     },
     {
         "name": "AV52",
         "cores": 52,
-        "ram": 1536
+        "ram": 1536,
+        "cpu_model": "Intel Xeon Platinum 8270",
+        "cpu_architecture": "Cascade Lake",
+        "cpu_speed_ghz": 2.7,
+        "cpu_turbo_speed_ghz": 4.0,
+        "cpu_number": 2,
+        "logical_threads_with_hyperthreading": 104,
+        "vsan_architecture": "OSA",
+        "vsan_cache_capacity_in_tb": 1.5,
+        "vsan_cache_storage_technology": "Intel cache",
+        "vsan_capacity_tier_in_tb": 38.40,
+        "vsan_capacity_tier_storage_technology": "NVMe"
     },
     {
         "name": "AV64",
         "cores": 64,
-        "ram": 1024
+        "ram": 1024,
+        "cpu_model": "Intel Xeon Platinum 8370C",
+        "cpu_architecture": "Ice Lake",
+        "cpu_speed_ghz": 2.8,
+        "cpu_turbo_speed_ghz": 3.5,
+        "cpu_number": 2,
+        "logical_threads_with_hyperthreading": 128,
+        "vsan_architecture": "OSA",
+        "vsan_cache_capacity_in_tb": 3.84,
+        "vsan_cache_storage_technology": "NVMe",
+        "vsan_capacity_tier_in_tb": 15.36,
+        "vsan_capacity_tier_storage_technology": "NVMe"
     },
     {
         "name": "AV48",
         "cores": 48,
-        "ram": 1024
+        "ram": 1024,
+        "cpu_model": "Intel Xeon Gold 6442Y",
+        "cpu_architecture": "Sapphire Rapids",
+        "cpu_speed_ghz": 2.6,
+        "cpu_turbo_speed_ghz": 4.0,
+        "cpu_number": 2,
+        "logical_threads_with_hyperthreading": 96,
+        "vsan_architecture": "ESA",
+        "vsan_cache_capacity_in_tb": 0,
+        "vsan_cache_storage_technology": "N/A",
+        "vsan_capacity_tier_in_tb": 25.6,
+        "vsan_capacity_tier_storage_technology": "NVMe"
     }
 ]

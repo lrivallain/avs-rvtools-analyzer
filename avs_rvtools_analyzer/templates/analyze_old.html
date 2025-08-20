@@ -1,0 +1,1017 @@
+{% extends 'base.html' %}
+
+{% block title %}AVS Migration Risks Analysis{% endblock %}
+
+{% block content %}
+<div class="container">
+<h1 class="text-center">AVS Migration Risks Analysis</h1>
+<p class="text-center lead">This page will display potential migration risks for the uploaded file: <code>{{ filename }}</code></p>
+
+{% if counts %}
+<div class="d-flex flex-wrap justify-content-start" id="summary-cards">
+    {% if counts.vusb_count > 0 %}
+    <a href="#vusb-card" class="card m-2 text-decoration-none" style="width: 18rem;" title="Click to view more details about vUSB Devices">
+        <div class="card-body">
+            <h5 class="card-title">vUSB Devices</h5>
+            <p class="card-text">Count: {{ counts.vusb_count }}</p>
+        </div>
+        <div class="card-footer">
+            <span class="badge rounded-pill text-bg-danger">Sev: Blocking</span>
+        </div>
+    </a>
+    {% endif %}
+
+    {% if counts.risky_disks_count > 0 %}
+    <a href="#risky-disks-card" class="card m-2 text-decoration-none" style="width: 18rem;" title="Click to view more details about Risky Disks">
+        <div class="card-body">
+            <h5 class="card-title">Risky Disks</h5>
+            <p class="card-text">Count: {{ counts.risky_disks_count }}</p>
+        </div>
+        <div class="card-footer">
+            <span class="badge rounded-pill text-bg-danger">Sev: Blocking</span>
+        </div>
+    </a>
+    {% endif %}
+
+    {% if counts.non_dvs_switch_count > 0 %}
+    <a href="#vswitch-card" class="card m-2 text-decoration-none" style="width: 18rem;" title="Click to view more details about Non dvSwitch Ports">
+        <div class="card-body">
+            <h5 class="card-title">Non dvSwitch Ports</h5>
+            <p class="card-text">Count: {{ counts.non_dvs_switch_count }}</p>
+        </div>
+        <div class="card-footer">
+            <span class="badge rounded-pill text-bg-danger">Sev: Blocking</span>
+        </div>
+    </a>
+    {% endif %}
+
+    {% if counts.vsnapshot_count > 0 %}
+    <a href="#vsnapshot-card" class="card m-2 text-decoration-none" style="width: 18rem;" title="Click to view more details about vSnapshots">
+        <div class="card-body">
+            <h5 class="card-title">vSnapshots</h5>
+            <p class="card-text">Count: {{ counts.vsnapshot_count }}</p>
+        </div>
+        <div class="card-footer">
+            <span class="badge rounded-pill text-bg-warning">Sev: Warning</span>
+        </div>
+    </a>
+    {% endif %}
+
+    {% if counts.suspended_vms_count > 0 %}
+    <a href="#suspended-vms-card" class="card m-2 text-decoration-none" style="width: 18rem;" title="Click to view more details about Suspended VMs">
+        <div class="card-body">
+            <h5 class="card-title">Suspended VMs</h5>
+            <p class="card-text">Count: {{ counts.suspended_vms_count }}</p>
+        </div>
+        <div class="card-footer">
+            <span class="badge rounded-pill text-bg-warning">Sev: Warning</span>
+        </div>
+    </a>
+    {% endif %}
+
+    {% if counts.dvport_issues_count > 0 %}
+    <a href="#dvport-issues-card" class="card m-2 text-decoration-none" style="width: 18rem;" title="Click to view more details about dvPort Issues">
+        <div class="card-body">
+            <h5 class="card-title">dvPort Issues</h5>
+            <p class="card-text">Count: {{ counts.dvport_issues_count }}</p>
+        </div>
+        <div class="card-footer">
+            <span class="badge rounded-pill text-bg-warning">Sev: Warning</span>
+        </div>
+    </a>
+    {% endif %}
+
+    {% if counts.non_intel_hosts_count > 0 %}
+    <a href="#non-intel-hosts-card" class="card m-2 text-decoration-none" style="width: 18rem;" title="Click to view more details about Non-Intel Hosts">
+        <div class="card-body">
+            <h5 class="card-title">Non-Intel Hosts</h5>
+            <p class="card-text">Count: {{ counts.non_intel_hosts_count }}</p>
+        </div>
+        <div class="card-footer">
+            <span class="badge rounded-pill text-bg-warning">Sev: Warning</span>
+        </div>
+    </a>
+    {% endif %}
+
+    {% if counts.cdrom_issues_count > 0 %}
+    <a href="#cdrom-issues-card" class="card m-2 text-decoration-none" style="width: 18rem;" title="Click to view more details about CD-ROM Issues">
+        <div class="card-body">
+            <h5 class="card-title">CD-ROM Issues</h5>
+            <p class="card-text">Count: {{ counts.cdrom_issues_count }}</p>
+        </div>
+        <div class="card-footer">
+            <span class="badge rounded-pill text-bg-warning">Sev: Warning</span>
+        </div>
+    </a>
+    {% endif %}
+
+    {% if counts.oracle_vms_count > 0 %}
+    <a href="#oracle-vms-card" class="card m-2 text-decoration-none" style="width: 18rem;" title="Click to view more details about Oracle VMs">
+        <div class="card-body">
+            <h5 class="card-title">Oracle VMs</h5>
+            <p class="card-text">Count: {{ counts.oracle_vms_count }}</p>
+        </div>
+        <div class="card-footer">
+            <span class="badge rounded-pill text-bg-info">Sev: Info</span>
+        </div>
+    </a>
+    {% endif %}
+
+    {% if counts.esx_version_count > 1 %}
+    <a href="#esx-version-card" class="card m-2 text-decoration-none" style="width: 18rem;" title="Click to view more details about ESX Versions">
+        <div class="card-body">
+            <h5 class="card-title">ESX Versions</h5>
+            <p class="card-text">Count: {{ counts.esx_version_count }}</p>
+        </div>
+        <div class="card-footer">
+            <span class="badge rounded-pill text-bg-{{ esx_version_card_risk }}">Sev: {% if esx_version_card_risk == 'danger' %}Blocking{% elif esx_version_card_risk == 'warning' %}Warning{% else %}Info{% endif %}</span>
+        </div>
+    </a>
+    {% endif %}
+
+    {% if large_provisioned_vms %}
+    <a href="#large-provisioned-vms-card" class="card m-2 text-decoration-none" style="width: 18rem;" title="Click to view more details about VMs with Large Provisioned Storage">
+        <div class="card-body">
+            <h5 class="card-title">VMs with Large Provisioned Storage</h5>
+            <p class="card-text">Count: {{ large_provisioned_vms | length }}</p>
+        </div>
+        <div class="card-footer">
+            <span class="badge rounded-pill text-bg-warning">Sev: Warning</span>
+        </div>
+    </a>
+    {% endif %}
+
+    {% if vmtools_not_running %}
+    <a href="#vmtools-not-running-card" class="card m-2 text-decoration-none" style="width: 18rem;" title="Click to view more details about VMs without VMware Tools">
+        <div class="card-body">
+            <h5 class="card-title">Powered On VMs without VMware Tools</h5>
+            <p class="card-text">Count: {{ vmtools_not_running | length }}</p>
+        </div>
+        <div class="card-footer">
+            <span class="badge rounded-pill text-bg-warning">Sev: Warning</span>
+        </div>
+    </a>
+    {% endif %}
+
+    {% if high_vcpu_vms %}
+    <a href="#high-vcpu-vms-card" class="card m-2 text-decoration-none" style="width: 18rem;" title="Click to view more details about VMs with high vCPU count">
+        <div class="card-body">
+            <h5 class="card-title">VMs with high vCPU count</h5>
+            <p class="card-text">Count: {{ high_vcpu_vms | length }}</p>
+        </div>
+        <div class="card-footer">
+            <span class="badge rounded-pill text-bg-warning">Sev: Warning</span>
+        </div>
+    </a>
+    {% endif %}
+
+    {% if high_memory_vms %}
+    <a href="#high-memory-vms-card" class="card m-2 text-decoration-none" style="width: 18rem;" title="Click to view more details about VMs with high memory allocation">
+        <div class="card-body">
+            <h5 class="card-title">VMs with high memory allocation</h5>
+            <p class="card-text">Count: {{ high_memory_vms | length }}</p>
+        </div>
+        <div class="card-footer">
+            <span class="badge rounded-pill text-bg-warning">Sev: Warning</span>
+        </div>
+    </a>
+    {% endif %}
+</div>
+{% endif %}
+
+<div class="d-flex justify-content-end mb-3">
+    <div class="btn-group" role="group" aria-label="Filter Severity">
+        <button type="button" class="btn btn-outline-primary" onclick="filterCards('all')">All</button>
+        <button type="button" class="btn btn-outline-danger" onclick="filterCards('blocking')">Blocking</button>
+        <button type="button" class="btn btn-outline-warning" onclick="filterCards('warning')">Warning</button>
+        <button type="button" class="btn btn-outline-info" onclick="filterCards('info')">Info</button>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+{% if vusb_devices %}
+<div class="card mb-4" id="vusb-card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h2>vUSB Devices</h2>
+        <button class="btn btn-primary" data-id="vusb-devices-table" onclick="downloadTableAsCSV(this)">Download CSV</button>
+    </div>
+    <div class="card-body">
+        <p>vUSB devices are USB devices that are connected to a virtual machine (VM) in a VMware environment. They can be used
+            for various purposes, such as connecting USB storage devices, printers, or other peripherals to the VM.</p>
+        <div class="alert alert-primary" role="alert">
+            <i class="fa-solid fa-circle-info"></i>
+            Having vUSB devices connected to VMs can pose a risk during migration, as they cannot be transferred to an Azure Managed environment
+            <br><br>
+            It's recommended to review the list of vUSB devices and ensure that they are necessary for the VM's operation before
+            proceeding with the migration.
+        </div>
+        <table class="table table-striped" id="vusb-devices-table">
+            <thead>
+                <tr>
+                    <th>VM</th>
+                    <th>Powerstate</th>
+                    <th>Device Type</th>
+                    <th>Connected</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for device in vusb_devices %}
+                <tr>
+                    <td>{{ device.VM }}</td>
+                    <td>{{ device.Powerstate }}</td>
+                    <td>{{ device["Device Type"] }}</td>
+                    <td>
+                        {% if device.Connected %}
+                        <span class="text-success"><strong>✓</strong></span>
+                        {% else %}
+                        <span class="text-danger">✘</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer">
+        <span class="badge rounded-pill text-bg-danger">Sev: Blocking</span>
+    </div>
+</div>
+{% endif %}
+
+{% if risky_disks %}
+<div class="card mb-4" id="risky-disks-card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h2>Risky Disks</h2>
+        <button class="btn btn-primary" data-id="risky-disks-table" onclick="downloadTableAsCSV(this)">Download CSV</button>
+    </div>
+    <div class="card-body">
+        <div class="alert alert-primary" role="alert">
+            <i class="fa-solid fa-circle-info"></i>
+            Risky disks are virtual disks that are configured in a way that may pose a risk during migration to an Azure Managed
+            environment.
+            <br><br>
+            This can include disks that are set to "Independent" mode, which means they are not affected by snapshots or other operations,
+            or disks that are configured with Raw Device Mapping capability.
+            <br><br>
+            It's recommended to review the list of risky disks and consider reconfiguring them before proceeding with the migration.
+        </div>
+        <table class="table table-striped" id="risky-disks-table">
+            <thead>
+                <tr>
+                    <th>VM</th>
+                    <th>Powerstate</th>
+                    <th>Disk</th>
+                    <th>Capacity MiB</th>
+                    <th>Raw</th>
+                    <th>Disk Mode</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for disk in risky_disks %}
+                <tr>
+                    <td>{{ disk.VM }}</td>
+                    <td>{{ disk.Powerstate }}</td>
+                    <td>{{ disk.Disk }}</td>
+                    <td>{{ disk["Capacity MiB"] | convert_mib_to_human_readable}}</td>
+                    <td>{{ disk.Raw }}</td>
+                    <td>{{ disk["Disk Mode"] }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer">
+        <span class="badge rounded-pill text-bg-danger">Sev: Blocking</span>
+    </div>
+</div>
+{% endif %}
+
+{% if counts.non_dvs_switch_count > 0 %}
+<div class="card mb-4" id="vswitch-card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h2>(d)vSwitch Usage Statistics</h2>
+    </div>
+    <div class="card-body">
+        <p>This chart shows the distribution of VMs and ports using dvSwitches or standard vSwitches.
+            The "standard vSwitch" ports are highlighted in red.</p>
+        <div class="alert alert-primary" role="alert">
+            <i class="fa-solid fa-circle-info"></i>
+            HCX network extension functionality requires the use of distributed switches (dvSwitches). In case of standard vSwitches,
+            the migration process will be more complex and may require additional steps to ensure network connectivity.
+        </div>
+        <div class="chart-container" style="position: relative; height:40vh; width:80vw">
+            <canvas id="switchUsageChart"></canvas>
+        </div>
+    </div>
+    <div class="card-footer">
+        <span class="badge rounded-pill text-bg-danger">Sev: Blocking</span>
+    </div>
+</div>
+
+<script>
+    const switchCtx = document.getElementById('switchUsageChart').getContext('2d');
+    const switchData = JSON.parse('{{ switch_statistics | tojson | safe }}');
+
+    const switchLabels = Object.keys(switchData);
+    const switchCounts = Object.values(switchData);
+
+    new Chart(switchCtx, {
+        type: 'pie',
+        data: {
+            labels: switchLabels,
+            datasets: [{
+                label: 'Switch Usage Statistics',
+                data: switchCounts,
+                backgroundColor: switchLabels.map(label => label === 'standard vSwitch' ? 'rgba(255, 99, 132, 0.2)' : 'rgba(54, 162, 235, 0.2)'),
+                borderColor: switchLabels.map(label => label === 'standard vSwitch' ? 'rgba(255, 99, 132, 1)' : 'rgba(54, 162, 235, 1)'),
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'top',
+                },
+                title: {
+                    display: true,
+                    text: 'Switch Usage Statistics'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(tooltipItem) {
+                            const total = tooltipItem.dataset.data.reduce((acc, value) => acc + value, 0);
+                            const value = tooltipItem.raw;
+                            const percentage = ((value / total) * 100).toFixed(2);
+                            return `${tooltipItem.label}: ${value} (${percentage}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+</script>
+{% endif %}
+
+{% if vsnapshot_data %}
+<div class="card mb-4" id="vsnapshot-card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h2>vSnapshot Data</h2>
+        <button class="btn btn-primary" data-id="vsnapshot-data-table" onclick="downloadTableAsCSV(this)">Download
+            CSV</button>
+    </div>
+    <div class="card-body">
+        <p>vSnapshots are virtual machine snapshots that are created in a VMware environment.
+            They allow you to capture the state of a VM at a specific point in time,
+            enabling you to revert back to that state if needed.</p>
+        <div class="alert alert-primary" role="alert">
+            <i class="fa-solid fa-circle-info"></i>
+            Having multiple vSnapshots can pose a risk during migration, as they can increase the complexity of the
+            migration process and may lead to data loss if not handled properly.
+            <br><br>
+            It's recommended to review the list of vSnapshots and consider consolidating or deleting unnecessary
+            snapshots before proceeding with the migration.
+        </div>
+        <table class="table table-striped" id="vsnapshot-data-table">
+            <thead>
+                <tr>
+                    <th>VM</th>
+                    <th>Name</th>
+                    <th>Date / time</th>
+                    <th>Size MiB (vmsn)</th>
+                    <th>Description</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for snapshot in vsnapshot_data %}
+                <tr>
+                    <td>{{ snapshot.VM }}</td>
+                    <td>{{ snapshot.Name }}</td>
+                    <td>{{ snapshot["Date / time"] }}</td>
+                    <td>{{ snapshot["Size MiB (vmsn)"] | convert_mib_to_human_readable}}</td>
+                    <td>{{ snapshot.Description }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer">
+        <span class="badge rounded-pill text-bg-warning">Sev: Warning</span>
+    </div>
+</div>
+{% endif %}
+
+{% if suspended_vms %}
+<div class="card mb-4" id="suspended-vms-card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h2>Suspended VMs</h2>
+        <button class="btn btn-primary" data-id="suspended-vms-table" onclick="downloadTableAsCSV(this)">Download CSV</button>
+    </div>
+    <div class="card-body">
+        <p>Suspended VMs are virtual machines that are not currently running but have their state saved.
+            This allows for quick restoration to the previous state when needed.</p>
+        <div class="alert alert-primary" role="alert">
+            <i class="fa-solid fa-circle-info"></i>
+            Suspended VMs can pose a risk during migration, as it will be necessary to power them on or off before proceeding with the migration.
+            <br><br>
+            It's recommended to review the list of suspended VMs and consider powering them on or off before proceeding with the migration.
+        </div>
+        <table class="table table-striped" id="suspended-vms-table">
+            <thead>
+                <tr>
+                    <th>VM</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for vm in suspended_vms %}
+                <tr>
+                    <td>{{ vm.VM }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer">
+        <span class="badge rounded-pill text-bg-warning">Sev: Warning</span>
+    </div>
+</div>
+{% endif %}
+
+{% if dvport_issues %}
+<div class="card mb-4" id="dvport-issues-card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h2>dvPort Issues</h2>
+        <button class="btn btn-primary" data-id="dvport-issues-table" onclick="downloadTableAsCSV(this)">Download CSV</button>
+    </div>
+    <div class="card-body">
+        <p>
+            dvPort issues are related to the configuration of distributed virtual ports in a VMware environment.
+            These issues can arise from misconfigurations or settings that may not be compatible with the target environment.
+        </p>
+        <div class="alert alert-primary" role="alert">
+            <i class="fa-solid fa-circle-info"></i>
+            Multiple dvPort issues can pose a risk during migration:
+            <ul>
+                <li>VLAN ID 0 or empty: they cannot be extended via HCX</li>
+                <li>Allow Promiscuous mode enabled</li>
+                <li>Mac Changes enabled</li>
+                <li>Forged Transmits enabled</li>
+            </ul>
+        </div>
+        <table class="table table-striped" id="dvport-issues-table">
+            <thead>
+                <tr>
+                    <th>Port</th>
+                    <th>Switch</th>
+                    <th>Object ID</th>
+                    <th>VLAN ID</th>
+                    <th>Allow Promiscuous</th>
+                    <th>Mac Changes</th>
+                    <th>Forged Transmits</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for issue in dvport_issues %}
+                <tr>
+                    <td>{{ issue.Port }}</td>
+                    <td>{{ issue.Switch }}</td>
+                    <td>{{ issue["Object ID"] }}</td>
+                    <td>
+                        {% if issue.VLAN == 0 or issue.VLAN == '' %}
+                        <span class="text-danger">{{ issue.VLAN }}</span>
+                        {% else %}
+                        {{ issue.VLAN }}
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if issue["Allow Promiscuous"] %}
+                        <span class="text-danger"><strong>✓</strong></span>
+                        {% else %}
+                        <span class="text-success">✘</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if issue["Mac Changes"] %}
+                        <span class="text-danger"><strong>✓</strong></span>
+                        {% else %}
+                        <span class="text-success">✘</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if issue["Forged Transmits"] %}
+                        <span class="text-danger"><strong>✓</strong></span>
+                        {% else %}
+                        <span class="text-success">✘</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer">
+        <span class="badge rounded-pill text-bg-warning">Sev: Warning</span>
+    </div>
+</div>
+{% endif %}
+
+{% if counts.non_intel_hosts_count > 0 %}
+<div class="card mb-4" id="non-intel-hosts-card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h2>Non-Intel Hosts</h2>
+        <button class="btn btn-primary" data-id="non-intel-hosts-table" onclick="downloadTableAsCSV(this)">Download CSV</button>
+    </div>
+    <div class="card-body">
+        <p>The following hosts have CPU models that are not Intel. This may pose compatibility issues during migration.</p>
+        <div class="alert alert-primary" role="alert">
+            <i class="fa-solid fa-circle-info"></i>
+            As Azure VMware Solution is Intel based service, a cold migration strategy will be required for the workload in these hosts.
+        </div>
+        <table class="table table-striped" id="non-intel-hosts-table">
+            <thead>
+                <tr>
+                    <th>Host</th>
+                    <th>Datacenter</th>
+                    <th>Cluster</th>
+                    <th>CPU Model</th>
+                    <th># VMs</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for host in non_intel_hosts %}
+                <tr>
+                    <td>{{ host.Host }}</td>
+                    <td>{{ host.Datacenter }}</td>
+                    <td>{{ host.Cluster }}</td>
+                    <td>{{ host["CPU Model"] }}</td>
+                    <td>{{ host["# VMs"] }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer">
+        <span class="badge rounded-pill text-bg-warning">Sev: Warning</span>
+    </div>
+</div>
+{% endif %}
+
+{% if cdrom_issues %}
+<div class="card mb-4" id="cdrom-issues-card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h2>VMs with CD-ROM Connectivity Issues</h2>
+        <button class="btn btn-primary" data-id="cdrom-issues-table" onclick="downloadTableAsCSV(this)">Download
+            CSV</button>
+    </div>
+    <div class="card-body">
+        <p>The following VMs have CD-ROM devices that are connected. This may pose risks during migration.</p>
+        <div class="alert alert-primary" role="alert">
+            <i class="fa-solid fa-circle-info"></i>
+            CD-ROM devices connected to VMs can cause issues during migration. It's recommended to review and disconnect
+            unnecessary CD-ROM devices before proceeding.
+        </div>
+        <table class="table table-striped" id="cdrom-issues-table">
+            <thead>
+                <tr>
+                    <th>VM</th>
+                    <th>Powerstate</th>
+                    <th>Connected</th>
+                    <th>Starts Connected</th>
+                    <th>Device Type</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for issue in cdrom_issues %}
+                <tr>
+                    <td>{{ issue.VM }}</td>
+                    <td>{{ issue.Powerstate }}</td>
+                    <td>
+                        {% if issue.Connected %}
+                        <span class="text-danger"><strong>✓</strong></span>
+                        {% else %}
+                        <span class="text-success">✘</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if issue["Starts Connected"] %}
+                        <span class="text-danger"><strong>✓</strong></span>
+                        {% else %}
+                        <span class="text-success">✘</span>
+                        {% endif %}
+                    </td>
+                    <td style="word-break:break-all;">{{ issue["Device Type"] }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer">
+        <span class="badge rounded-pill text-bg-warning">Sev: Warning</span>
+    </div>
+</div>
+{% endif %}
+
+{% if vmtools_not_running %}
+<div class="card mb-4" id="vmtools-not-running-card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h2>Powered On VMs without VMware Tools</h2>
+        <button class="btn btn-primary" data-id="vmtools-not-running-table" onclick="downloadTableAsCSV(this)">Download CSV</button>
+    </div>
+    <div class="card-body">
+        <p>The following VMs are powered on but their VMware Tools are not running.</p>
+        <div class="alert alert-primary" role="alert">
+            <i class="fa-solid fa-circle-info"></i>
+            VMs without VMware Tools running may not be able to use all the features of VMware HCX during migration.
+            <br><br>
+            It's recommended to ensure that VMware Tools are installed, running and up-to-date on all powered-on VMs
+            before proceeding with the migration.
+        </div>
+        <table class="table table-striped" id="vmtools-not-running-table">
+            <thead>
+                <tr>
+                    <th>VM</th>
+                    <th>Powerstate</th>
+                    <th>Guest state</th>
+                    <th>OS according to the configuration file</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for vm in vmtools_not_running %}
+                <tr>
+                    <td>{{ vm.VM }}</td>
+                    <td>{{ vm.Powerstate }}</td>
+                    <td>{{ vm["Guest state"] }}</td>
+                    <td>{{ vm["OS according to the configuration file"] }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer">
+        <span class="badge rounded-pill text-bg-warning">Sev: Warning</span>
+    </div>
+</div>
+{% endif %}
+
+{% if large_provisioned_vms %}
+<div class="card mb-4" id="large-provisioned-vms-card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h2>VMs with Large Provisioned Storage</h2>
+        <button class="btn btn-primary" data-id="large-provisioned-vms-table"
+            onclick="downloadTableAsCSV(this)">Download CSV</button>
+    </div>
+    <div class="card-body">
+        <p>The following VMs have provisioned storage exceeding 10TB. This may pose challenges during migration.</p>
+        <div class="alert alert-primary" role="alert">
+            <i class="fa-solid fa-circle-info"></i>
+            Large provisioned storage can lead to increased migration times and potential compatibility issues. It's
+            recommended to review these VMs and optimize storage usage if possible.
+        </div>
+        <table class="table table-striped" id="large-provisioned-vms-table">
+            <thead>
+                <tr>
+                    <th>VM</th>
+                    <th>Provisioned MiB</th>
+                    <th>In Use MiB</th>
+                    <th>CPUs</th>
+                    <th>Memory</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for vm in large_provisioned_vms %}
+                <tr>
+                    <td>{{ vm.VM }}</td>
+                    <td>{{ vm["Provisioned MiB"] | convert_mib_to_human_readable }}</td>
+                    <td>{{ vm["In Use MiB"] | convert_mib_to_human_readable }}</td>
+                    <td>{{ vm.CPUs }}</td>
+                    <td>{{ vm.Memory }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer">
+        <span class="badge rounded-pill text-bg-warning">Sev: Warning</span>
+    </div>
+</div>
+{% endif %}
+
+{% if oracle_vms %}
+<div class="card mb-4" id="oracle-vms-card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h2>Oracle VMs</h2>
+        <button class="btn btn-primary" data-id="oracle-vms-table" onclick="downloadTableAsCSV(this)">Download CSV</button>
+    </div>
+    <div class="card-body">
+        <p>Oracle VMs are virtual machines specifically configured to run Oracle software.</p>
+        <div class="alert alert-primary" role="alert">
+            <i class="fa-solid fa-circle-info"></i>
+            Oracle VMs hosting in Azure VMware Solution is supported but may require costly licensing.
+            <br><br>
+            It's recommended to review the list of Oracle VMs and envision alternative hosting options to avoid
+            unnecessary costs.
+        </div>
+        <table class="table table-striped" id="oracle-vms-table">
+            <thead>
+                <tr>
+                    <th>VM</th>
+                    <th>OS according to the VMware Tools</th>
+                    <th>Powerstate</th>
+                    <th>CPUs</th>
+                    <th>Memory</th>
+                    <th>Provisioned MiB</th>
+                    <th>In Use MiB</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for vm in oracle_vms %}
+                <tr>
+                    <td>{{ vm.VM }}</td>
+                    <td>{{ vm["OS according to the VMware Tools"] }}</td>
+                    <td>{{ vm.Powerstate }}</td>
+                    <td>{{ vm.CPUs }}</td>
+                    <td>{{ vm.Memory }}</td>
+                    <td>{{ vm["Provisioned MiB"] | convert_mib_to_human_readable}}</td>
+                    <td>{{ vm["In Use MiB"] | convert_mib_to_human_readable}}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer">
+        <span class="badge rounded-pill text-bg-info">Sev: Info</span>
+    </div>
+</div>
+{% endif %}
+
+{% if counts.esx_version_count > 1 %}
+<div class="card mb-4" id="esx-version-card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h2>ESX Version Distribution</h2>
+        <button class="btn btn-primary" data-id="esx-version-table" onclick="downloadTableAsCSV(this)">Download CSV</button>
+    </div>
+    <div class="card-body">
+        <p>This chart shows the distribution of ESX versions found in the uploaded file. The data is represented as a
+            pie chart.</p>
+        <div class="alert alert-primary" role="alert">
+            <i class="fa-solid fa-circle-info"></i>
+            Having multiple ESX versions in the environment can lead to compatibility issues and increased complexity
+            during migration.
+            <br><br>
+            It's recommended to standardize on a single ESX version if possible.
+            <br>
+            <ul>
+                <li>Versions lower than {{ WARNING_ESXI_VERSION_THRESHOLD }}: <span class="badge rounded-pill text-bg-warning">Warning</span></li>
+                <li>Versions lower than {{ ERROR_ESXI_VERSION_THRESHOLD }}: <span class="badge rounded-pill text-bg-danger">Blocking</span></li>
+            </ul>
+        </div>
+        <div class="chart-container" style="position: relative; height:40vh; width:80vw">
+            <canvas id="esxVersionChart"></canvas>
+        </div>
+
+        <table class="table table-striped" id="esx-version-table">
+            <thead>
+                <tr>
+                    <th>ESX Version</th>
+                    <th>Count</th>
+                    <th>Risk Level</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for version, count in esx_version_data.items() %}
+                <tr>
+                    <td>{{ version }}</td>
+                    <td>{{ count }}</td>
+                    <td>
+                        {% if version in esx_version_risks %}
+                            {% if esx_version_risks[version] == "blocking" %}
+                                <span class="badge rounded-pill text-bg-danger">Blocking</span>
+                            {% elif esx_version_risks[version] == "warning" %}
+                                <span class="badge rounded-pill text-bg-warning">Warning</span>
+                            {% else %}
+                                <span class="badge rounded-pill text-bg-info">Info</span>
+                            {% endif %}
+                        {% else %}
+                            <span class="badge rounded-pill text-bg-success">None</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer">
+        <span class="badge rounded-pill text-bg-{{ esx_version_card_risk }}">Sev: {% if esx_version_card_risk == 'danger' %}Blocking{% elif esx_version_card_risk == 'warning' %}Warning{% else %}Info{% endif %}</span>
+    </div>
+</div>
+
+<script>
+    const ctx = document.getElementById('esxVersionChart').getContext('2d');
+    const esxVersionData = JSON.parse('{{ esx_version_data | tojson | safe }}');
+
+    const labels = Object.keys(esxVersionData);
+    const data = Object.values(esxVersionData);
+
+    new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'ESX Version Distribution',
+                data: data,
+                backgroundColor: [
+                    'rgba(255, 99, 132, 0.2)',
+                    'rgba(54, 162, 235, 0.2)',
+                    'rgba(255, 206, 86, 0.2)',
+                    'rgba(75, 192, 192, 0.2)',
+                    'rgba(153, 102, 255, 0.2)',
+                    'rgba(255, 159, 64, 0.2)'
+                ],
+                borderColor: [
+                    'rgba(255, 99, 132, 1)',
+                    'rgba(54, 162, 235, 1)',
+                    'rgba(255, 206, 86, 1)',
+                    'rgba(75, 192, 192, 1)',
+                    'rgba(153, 102, 255, 1)',
+                    'rgba(255, 159, 64, 1)'
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'top',
+                },
+                title: {
+                    display: true,
+                    text: 'ESX Version Distribution'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function (tooltipItem) {
+                            const total = tooltipItem.dataset.data.reduce((acc, value) => acc + value, 0);
+                            const value = tooltipItem.raw;
+                            const percentage = ((value / total) * 100).toFixed(2);
+                            return `${tooltipItem.label}: ${value} (${percentage}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+</script>
+{% endif %}
+
+{% if high_vcpu_vms %}
+    <div class="card mb-4" id="high-vcpu-vms-card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h2>VMs with high vCPU count</h2>
+        </div>
+        <div class="card-body">
+            <p>The following VMs have a vCPU count higher than the core count of available SKUs.</p>
+            <div class="alert alert-primary" role="alert">
+                <i class="fa-solid fa-circle-info"></i>
+                The VMs with more vCPUs configured than the available SKUs core count will not be able to run on the target hosts.
+            </div>
+            <p>Ensure to review the configurations for optimization.</p>
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>VM</th>
+                        <th>vCPU Count</th>
+                        {% for sku in high_vcpu_vms[0].keys() if sku != 'VM' and sku != 'vCPU Count' %}
+                        <th>{{ sku }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for vm in high_vcpu_vms %}
+                    <tr>
+                        <td>{{ vm.VM }}</td>
+                        <td>{{ vm['vCPU Count'] }}</td>
+                        {% for sku, status in vm.items() if sku != 'VM' and sku != 'vCPU Count' %}
+                        <td>{% if status == '✘' %}<span class="text-danger">{{ status }}</span>{% else %}<span class="text-success">{{ status }}</span>{% endif %}</td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="card-footer">
+            <span class="badge rounded-pill text-bg-danger">Sev: Blocking</span>
+        </div>
+    </div>
+    {% endif %}
+
+{% if high_memory_vms %}
+    <div class="card mb-4" id="high-memory-vms-card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h2>VMs with high memory allocation</h2>
+        </div>
+        <div class="card-body">
+            <p>The following VMs have memory usage exceeding the capabilities of available SKUs.</p>
+            <div class="alert alert-primary" role="alert">
+                <i class="fa-solid fa-circle-info"></i>
+                The VMs with more memory configured than the available capacity per node will not be able to run on the target hosts.
+                <br><br>
+                For performance best practices, it is also recommended not to exceed half of the available memory per node on a single VM.
+            </div>
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>VM</th>
+                        <th>Memory (GB)</th>
+                        {% for sku in high_memory_vms[0].keys() if sku != 'VM' and sku != 'Memory (GB)' %}
+                        <th>{{ sku }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for vm in high_memory_vms %}
+                    <tr>
+                        <td>{{ vm.VM }}</td>
+                        <td>{{ vm['Memory (GB)'] }}</td>
+                        {% for sku, status in vm.items() if sku != 'VM' and sku != 'Memory (GB)' %}
+                        <td>{% if status == '✘' %}<span class="text-danger">{{ status }}</span>{% elif status == '⚠️' %}<span class="text-warning">{{ status }}</span>{% else %}<span class="text-success">{{ status }}</span>{% endif %}</td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="card-footer">
+            <span class="badge rounded-pill text-bg-danger">Sev: Blocking</span>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+    function downloadCSV(filename, jsonData) {
+        const data = JSON.parse(jsonData);
+        if (!data || data.length === 0) {
+            alert('No data available to download.');
+            return;
+        }
+
+        const csvContent = [
+            Object.keys(data[0]).join(','),
+            ...data.map(row => Object.values(row).map(value => `"${value}"`).join(','))
+        ].join('\n');
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `${filename}.csv`;
+        link.click();
+    }
+
+    function downloadTableAsCSV(button) {
+        const tableId = button.getAttribute('data-id');
+        const table = document.getElementById(tableId);
+        if (!table) {
+            alert('Table not found.');
+            return;
+        }
+
+        const rows = Array.from(table.querySelectorAll('tr'));
+        const csvContent = rows.map(row => {
+            const cells = Array.from(row.querySelectorAll('th, td'));
+            return cells.map(cell => `"${cell.textContent.trim()}"`).join(',');
+        }).join('\n');
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `${tableId}.csv`;
+        link.click();
+    }
+
+    function filterCards(severity) {
+        const cards = document.querySelectorAll('.card');
+        const summarySections = document.querySelectorAll('.accordion-item');
+
+        cards.forEach(card => {
+            const badge = card.querySelector('.badge');
+            if (card.id === 'summary-card' || severity === 'all' || (badge && badge.textContent.toLowerCase().includes(severity))) {
+                card.style.display = '';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+
+        summarySections.forEach(section => {
+            const badge = section.querySelector('.badge');
+            if (severity === 'all' || (badge && badge.textContent.toLowerCase().includes(severity))) {
+                section.style.display = '';
+            } else {
+                section.style.display = 'none';
+            }
+        });
+    }
+</script>
+
+{% endblock %}
