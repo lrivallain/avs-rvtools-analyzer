@@ -162,6 +162,7 @@ The application exposes three MCP tools for AI assistants:
 1. **`analyze_rvtools_file`**: Analyze uploaded RVTools files
 2. **`get_available_risks`**: List all supported risk categories
 3. **`get_risk_info`**: Get detailed information about specific risks
+4. **`get_sku_info`**: Retrieve SKU information for Azure VMware Solution
 
 ## Project Structure
 
