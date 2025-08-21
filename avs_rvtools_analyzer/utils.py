@@ -75,30 +75,3 @@ def allowed_file(filename, allowed_extensions=None):
     if allowed_extensions is None:
         allowed_extensions = {'xlsx'}
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in allowed_extensions
-
-
-def register_jinja_helpers(templates):
-    """
-    Register Jinja2 template helpers and filters.
-    
-    Args:
-        templates: Jinja2Templates instance
-    """
-    from fastapi.templating import Jinja2Templates
-    
-    # Register filters
-    templates.env.filters['convert_mib_to_human_readable'] = convert_mib_to_human_readable
-    
-    # Register global functions
-    templates.env.globals['get_risk_badge_class'] = get_risk_badge_class
-    templates.env.globals['get_risk_display_name'] = get_risk_display_name
-    
-    # Add version information if available
-    try:
-        # Try to get version from package metadata
-        import importlib.metadata
-        version = importlib.metadata.version("avs-rvtools-analyzer")
-        templates.env.globals['version'] = version
-    except Exception:
-        # Fallback version
-        templates.env.globals['version'] = "1.0.0"

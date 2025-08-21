@@ -22,11 +22,17 @@ A unified FastAPI application for analyzing RVTools data with both web interface
   - Oracle VMs (info)
   - ESX version compatibility (dynamic)
 
+## AI integration disclaimer
+
+The AI integration in RVTools Analyzer may produce unexpected behavior or inaccuracies in the analysis results. It is strongly recommended to review the output carefully and validate it against known data. Additionally, please ensure that data privacy and compliance requirements are taken into account when using AI tools, as submitted data will be shared with AI systems.
+
+The provided tools **run locally** to generate an analysis report from the uploaded RVTools file. If integrated with AI models, the data is processed and analyzed to deliver deeper insights and recommendations. If your AI models are not running in a local or secure environment, it is essential to verify that data is handled appropriately and in compliance with applicable regulations and your organization’s policies.
+
 ## Installation and Usage
 
 ### Prerequisites
 
-Make sure you have [uv](https://docs.astral.sh/uv/) installed:
+Make sure you have [`uv`](https://docs.astral.sh/uv/) installed:
 
 ```bash
 # On Windows (PowerShell)
@@ -36,7 +42,7 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-### Quick Start with uv
+### Quick Start with `uv`
 
 Run the unified application with both web UI and MCP API:
 
@@ -79,9 +85,11 @@ You can install RVTools Analyzer directly from PyPI:
 ```bash
 # Using uv (recommended)
 uv tool install avs-rvtools-analyzer
+uv run avs-rvtools-analyzer # run the tool
 
 # Using pip
 pip install avs-rvtools-analyzer
+avs-rvtools-analyzer # run the tool
 ```
 
 #### From Source
@@ -159,28 +167,10 @@ uv run avs-rvtools-analyzer --host 0.0.0.0 --port 9000
 
 The application exposes MCP tools for AI assistants:
 
-1. **`analyze_rvtools_file`**: Analyze uploaded RVTools files
-2. **`get_available_risks`**: List all supported risk categories
-3. **`get_risk_info`**: Get detailed information about specific risks
-4. **`get_sku_info`**: Retrieve SKU information for Azure VMware Solution
-
-## Project Structure
-
-```text
-avs-rvtools-analyzer/
-├── avs_rvtools_analyzer/      # Main application package
-│   ├── __init__.py           # Package initialization
-│   ├── main.py               # Unified FastAPI server (web UI + MCP API)
-│   ├── risk_detection.py     # Risk detection logic and functions
-│   ├── utils.py              # Utility functions and helpers
-│   ├── static/               # Static assets (CSS, JS, JSON)
-│   └── templates/            # Jinja2 templates
-├── tests/                    # Test suite
-├── test-data/               # Sample test data
-├── pyproject.toml           # Project configuration and dependencies
-├── README.md                # This file
-└── .gitignore              # Git ignore rules
-```
+1. **`analyze_file`**: Analyze RVTools file by providing a file path on the server.
+2. **`analyze_uploaded_file`**: Upload and analyze RVTools Excel file.
+3. **`list_available_risks`**: List all migration risks that can be assessed by this tool.
+4. **`get_sku_capabilities`**: Get Azure VMware Solution (AVS) SKU hardware capabilities and specifications.
 
 ## Contributing
 
