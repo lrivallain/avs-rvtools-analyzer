@@ -25,20 +25,8 @@ from ..models import (
     ExcelToJsonResponse,
     ExcelSheetInfo
 )
+from ..helpers import clean_value_for_json
 from .. import __version__ as calver_version
-
-
-def clean_value_for_json(value):
-    """Clean a single value for JSON serialization"""
-    if value is None:
-        return ''
-    elif isinstance(value, datetime):
-        return value.isoformat()
-    elif isinstance(value, (int, float, str, bool)):
-        return value
-    else:
-        # Convert other types to string
-        return str(value)
 
 
 class AnalyzeFileRequest(BaseModel):

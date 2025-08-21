@@ -14,6 +14,10 @@ from .helpers import (
     clean_function_name_for_display
 )
 from .decorators import risk_info
+
+import logging
+logger = logging.getLogger(__name__)
+
 ########################################################################################################################
 #                                                                                                                      #
 #                                               Risk Detection Functions                                               #
@@ -98,7 +102,7 @@ def detect_risky_disks(excel_data: pd.ExcelFile) -> Dict[str, Any]:
 
     vdisk_data = excel_data.parse('vDisk')
     risky_disks = vdisk_data[
-        (vdisk_data['Raw'] == True) |
+        (vdisk_data['Raw'] == "True") |
         (vdisk_data['Disk Mode'] == 'independent_persistent')
     ][['VM', 'Powerstate', 'Disk', 'Capacity MiB', 'Raw', 'Disk Mode']].to_dict(orient='records')
 
@@ -224,9 +228,9 @@ def detect_dvport_issues(excel_data: pd.ExcelFile) -> Dict[str, Any]:
 
     issues = dvport_data[
         (dvport_data['VLAN'].isnull()) |
-        (dvport_data['Allow Promiscuous'] == True) |
-        (dvport_data['Mac Changes'] == True) |
-        (dvport_data['Forged Transmits'] == True)
+        (dvport_data['Allow Promiscuous'] == "True") |
+        (dvport_data['Mac Changes'] == "True") |
+        (dvport_data['Forged Transmits'] == "True")
     ][['Port', 'Switch', 'Object ID', 'VLAN', 'Allow Promiscuous', 'Mac Changes', 'Forged Transmits']].to_dict(orient='records')
 
     return {
@@ -294,7 +298,7 @@ def detect_cdrom_issues(excel_data: pd.ExcelFile) -> Dict[str, Any]:
 
     vcd_data = excel_data.parse('vCD')
     cdrom_issues = vcd_data[
-        vcd_data['Connected'] == True
+        vcd_data['Connected'] == "True"
     ][['VM', 'Powerstate', 'Connected', 'Starts Connected', 'Device Type']].to_dict(orient='records')
 
     return {
@@ -403,41 +407,6 @@ def detect_high_memory_vms(excel_data: pd.ExcelFile) -> Dict[str, Any]:
                 }
             }
             high_memory_vms.append(vm_data_entry)
-
-    return {
-        'count': len(high_memory_vms),
-        'data': high_memory_vms
-    }
-def detect_high_memory_vms(excel_data: pd.ExcelFile) -> Dict[str, Any]:
-    """Detect VMs with high memory allocation."""
-    if 'vInfo' not in excel_data.sheet_names:
-        return {'count': 0, 'data': []}
-
-    # Load SKU data using cached function
-    try:
-        sku_data = _load_sku_data()
-    except FileNotFoundError:
-        return {'count': 0, 'data': [], 'error': 'SKU data file not found'}
-
-    vinfo_data = excel_data.parse('vInfo')
-    vinfo_data['Memory'] = pd.to_numeric(vinfo_data['Memory'], errors='coerce')
-
-    min_memory = min(sku['ram'] * 1024 for sku in sku_data)
-
-    high_memory_vms = []
-    for _, vm in vinfo_data.iterrows():
-        if vm['Memory'] > min_memory:
-            vm_data = {
-                'VM': vm['VM'],
-                'Memory (GB)': round(vm['Memory'] / 1024, 2),
-                **{
-                    sku['name']: ('✘' if vm['Memory'] > sku['ram'] * 1024
-                                else '⚠️' if vm['Memory'] > (sku['ram'] * 1024) / 2
-                                else '✓')
-                    for sku in sku_data
-                }
-            }
-            high_memory_vms.append(vm_data)
 
     return {
         'count': len(high_memory_vms),

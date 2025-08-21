@@ -2,7 +2,6 @@
 Web UI routes for AVS RVTools Analyzer.
 """
 import json
-from datetime import datetime
 from typing import Any
 
 from fastapi import FastAPI, File, UploadFile, Request
@@ -11,29 +10,7 @@ from fastapi.templating import Jinja2Templates
 
 from ..services import FileService, AnalysisService
 from ..config import AppConfig
-
-
-def json_serializer(obj):
-    """JSON serializer for objects not serializable by default json code"""
-    if isinstance(obj, datetime):
-        return obj.isoformat()
-    elif hasattr(obj, '__dict__'):
-        return obj.__dict__
-    else:
-        return str(obj)
-
-
-def clean_value_for_json(value):
-    """Clean a single value for JSON serialization"""
-    if value is None:
-        return ''
-    elif isinstance(value, datetime):
-        return value.isoformat()
-    elif isinstance(value, (int, float, str, bool)):
-        return value
-    else:
-        # Convert other types to string
-        return str(value)
+from ..helpers import clean_value_for_json, json_serializer
 
 
 def setup_web_routes(

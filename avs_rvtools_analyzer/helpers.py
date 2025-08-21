@@ -6,6 +6,7 @@ import functools
 from typing import Dict, List, Any, Optional
 import pandas as pd
 from pathlib import Path
+from datetime import datetime
 
 
 @functools.lru_cache(maxsize=1)
@@ -116,3 +117,40 @@ def clean_function_name_for_display(func_name: str) -> str:
         Cleaned display name
     """
     return func_name.replace('detect_', '').replace('_', ' ').title()
+
+
+def clean_value_for_json(value) -> str:
+    """Clean a single value for JSON serialization
+
+    Args:
+        value: The value to clean
+
+    Returns:
+        The cleaned value
+    """
+    if value is None:
+        return ''
+    elif isinstance(value, datetime):
+        return value.isoformat()
+    elif isinstance(value, (int, float, str, bool)):
+        return value
+    else:
+        # Convert other types to string
+        return str(value)
+
+
+def json_serializer(obj):
+    """JSON serializer for objects not serializable by default json code
+
+    Args:
+        obj: The object to serialize
+
+    Returns:
+        The serialized object
+    """
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    elif hasattr(obj, '__dict__'):
+        return obj.__dict__
+    else:
+        return str(obj)
