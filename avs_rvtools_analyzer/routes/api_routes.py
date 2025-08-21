@@ -8,7 +8,7 @@ from datetime import datetime, UTC
 
 from fastapi import FastAPI, HTTPException, File, UploadFile, Form
 from fastmcp import FastMCP
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 
 from ..services import FileService, AnalysisService, SKUService
@@ -21,15 +21,54 @@ from ..models import (
     SKUCapabilitiesResponse,
     RiskTypeInfo,
     SKUInfo,
-    ErrorResponse
+    ErrorResponse,
+    ExcelToJsonResponse,
+    ExcelSheetInfo
 )
 from .. import __version__ as calver_version
+
+
+def clean_value_for_json(value):
+    """Clean a single value for JSON serialization"""
+    if value is None:
+        return ''
+    elif isinstance(value, datetime):
+        return value.isoformat()
+    elif isinstance(value, (int, float, str, bool)):
+        return value
+    else:
+        # Convert other types to string
+        return str(value)
 
 
 class AnalyzeFileRequest(BaseModel):
     """Request model for file analysis."""
     file_path: str
     include_details: Optional[bool] = False
+
+
+class AnalyzeJsonRequest(BaseModel):
+    """Request model for JSON data analysis."""
+    data: Dict[str, List[Dict[str, Any]]] = Field(description="JSON data organized by sheet name")
+    include_details: Optional[bool] = Field(default=False, description="Include detailed analysis results")
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "data": {
+                    "vInfo": [
+                        {"VM": "VM-001", "Power": "poweredOn", "CPUs": 4, "Memory": 8192},
+                        {"VM": "VM-002", "Power": "poweredOff", "CPUs": 2, "Memory": 4096}
+                    ],
+                    "vCPU": [
+                        {"VM": "VM-001", "CPU Usage": "25%"},
+                        {"VM": "VM-002", "CPU Usage": "0%"}
+                    ]
+                },
+                "include_details": False
+            }
+        }
+    }
 
 
 def setup_api_routes(
@@ -59,6 +98,8 @@ def setup_api_routes(
                 "web_ui": config.endpoints.web_ui,
                 "analyze": config.endpoints.analyze,
                 "analyze_upload": config.endpoints.analyze_upload,
+                "analyze_json": config.endpoints.analyze_json,
+                "convert_to_json": config.endpoints.convert_to_json,
                 "available_risks": config.endpoints.available_risks,
                 "sku_capabilities": config.endpoints.sku_capabilities,
                 "health": config.endpoints.health,
@@ -191,6 +232,118 @@ def setup_api_routes(
                 summary=result.get("summary"),
                 total_risks_found=len([r for r in result.get("risks", {}).values() if r.get("count", 0) > 0]),
                 analysis_timestamp=datetime.now(UTC).isoformat() + "Z"
+            )
+
+        finally:
+            # Clean up temp file
+            file_service.cleanup_temp_file(temp_file_path)
+
+    @mcp.tool(
+        name="analyze_json_data",
+        description="Analyze JSON data for migration risks and compatibility issues.",
+        tags={"analysis", "json"}
+    )
+    @app.post("/api/analyze-json", tags=["API"], summary="Analyze JSON Data", description="Analyze JSON data (e.g., from converted Excel) for migration risks and compatibility issues", response_model=AnalysisResponse)
+    async def analyze_json_data(request: AnalyzeJsonRequest):
+        """Analyze JSON data for migration risks."""
+        try:
+            # Convert JSON data to the format expected by analysis service
+            # The request.data should be in format: {"sheet_name": [{"col1": "val1", ...}, ...]}
+            excel_data = {}
+            for sheet_name, sheet_data in request.data.items():
+                # Extract headers from first row if data exists
+                headers = list(sheet_data[0].keys()) if sheet_data else []
+
+                excel_data[sheet_name] = {
+                    'headers': headers,
+                    'data': sheet_data,
+                    'row_count': len(sheet_data)
+                }
+
+            # Validate Excel data
+            analysis_service.validate_excel_data(excel_data)
+
+            # Perform analysis
+            result = analysis_service.analyze_risks(
+                excel_data,
+                include_details=request.include_details,
+                filter_zero_counts=True
+            )
+
+            return AnalysisResponse(
+                success=True,
+                message="JSON data analysis completed successfully",
+                risks=result.get("risks", {}),
+                summary=result.get("summary"),
+                total_risks_found=len([r for r in result.get("risks", {}).values() if r.get("count", 0) > 0]),
+                analysis_timestamp=datetime.now(UTC).isoformat() + "Z"
+            )
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error analyzing JSON data: {str(e)}"
+            )
+
+    @mcp.tool(
+        name="convert_excel_to_json",
+        description="Convert Excel file to JSON format for AI model consumption.",
+        tags={"conversion", "json", "excel"}
+    )
+    @app.post("/api/convert-to-json", tags=["API"], summary="Convert Excel to JSON", description="Convert uploaded Excel file to JSON format for AI model analysis")
+    async def convert_excel_to_json(
+        file: UploadFile = File(...),
+        include_empty_cells: bool = Form(False),
+        max_rows_per_sheet: Optional[int] = Form(1000)
+    ):
+        """Convert Excel file to JSON format."""
+        # Validate file
+        file_service.validate_file(file)
+
+        # Save uploaded file
+        temp_file_path = await file_service.save_uploaded_file(file)
+
+        try:
+            # Load Excel file
+            excel_data = file_service.load_excel_file(temp_file_path)
+
+            # Convert to simplified JSON format - just the data
+            json_result = {}
+            for sheet_name, sheet_info in excel_data.items():
+                # Get the data from the sheet
+                sheet_data = sheet_info.get('data', [])
+
+                # Limit rows if specified
+                if max_rows_per_sheet and len(sheet_data) > max_rows_per_sheet:
+                    sheet_data = sheet_data[:max_rows_per_sheet]
+
+                # Process data based on include_empty_cells flag
+                if not include_empty_cells:
+                    # Remove rows where all values are None/empty
+                    filtered_data = []
+                    for row in sheet_data:
+                        if any(value is not None and str(value).strip() != '' for value in row.values()):
+                            # Clean each value for JSON serialization
+                            cleaned_row = {k: clean_value_for_json(v) for k, v in row.items()}
+                            filtered_data.append(cleaned_row)
+                    sheet_data = filtered_data
+                else:
+                    # Still clean values even when including empty cells
+                    sheet_data = [
+                        {k: clean_value_for_json(v) for k, v in row.items()}
+                        for row in sheet_data
+                    ]
+
+                # Store only the data for this sheet
+                json_result[sheet_name] = sheet_data
+
+            # Return simplified response with just the data
+            return json_result
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error converting Excel file to JSON: {str(e)}"
             )
 
         finally:

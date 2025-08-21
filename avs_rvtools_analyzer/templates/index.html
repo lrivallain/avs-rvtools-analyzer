@@ -15,14 +15,17 @@
                 <div class="mb-3">
                     <label for="file" class="form-label">Upload RVTools Excel File (.xlsx)</label>
                     <input class="form-control" type="file" id="file" name="file" accept=".xlsx" required>
-                    <div class="form-text">Select an RVTools export file to analyze migration risks and explore data.</div>
+                    <div class="form-text">Select an RVTools export file to analyze migration risks, explore data, or convert to JSON format.</div>
                 </div>
-                <div class="d-flex justify-content-between">
+                <div class="d-flex justify-content-between flex-wrap gap-2">
                     <button formaction="/explore" type="submit" class="btn btn-primary">
                         <i class="fas fa-search"></i> Explore File Content
                     </button>
                     <button formaction="/analyze" type="submit" class="btn btn-warning">
                         <i class="fas fa-exclamation-triangle"></i> Analyze Migration Risks
+                    </button>
+                    <button formaction="/convert-to-json" type="submit" class="btn btn-success">
+                        <i class="fas fa-download"></i> Convert and download as JSON
                     </button>
                 </div>
             </form>

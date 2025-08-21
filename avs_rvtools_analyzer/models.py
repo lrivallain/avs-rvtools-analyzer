@@ -226,6 +226,60 @@ class APIInfoResponse(BaseModel):
     mcp_enabled: bool = True
 
 
+class ExcelSheetInfo(BaseModel):
+    """Model for Excel sheet information in JSON conversion."""
+    data: List[Dict[str, Any]] = Field(description="Sheet data as list of dictionaries")
+    row_count: int = Field(description="Number of rows in the sheet")
+    column_count: int = Field(description="Number of columns in the sheet")
+    columns: List[str] = Field(description="List of column names")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "data": [
+                    {"VM": "VM-001", "Power": "poweredOn", "CPUs": 4, "Memory": 8192},
+                    {"VM": "VM-002", "Power": "poweredOff", "CPUs": 2, "Memory": 4096}
+                ],
+                "row_count": 2,
+                "column_count": 4,
+                "columns": ["VM", "Power", "CPUs", "Memory"]
+            }
+        }
+    )
+
+
+class ExcelToJsonResponse(BaseModel):
+    """Response model for Excel to JSON conversion."""
+    success: bool = Field(True, description="Whether the conversion was successful")
+    message: str = Field(description="Status message")
+    filename: str = Field(description="Original filename")
+    sheets: List[str] = Field(description="List of sheet names")
+    total_sheets: int = Field(description="Total number of sheets converted")
+    conversion_timestamp: str = Field(description="When the conversion was performed")
+    data: Dict[str, ExcelSheetInfo] = Field(description="Converted data organized by sheet name")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "success": True,
+                "message": "Successfully converted Excel file to JSON format",
+                "filename": "rvtools_export.xlsx",
+                "sheets": ["vInfo", "vCPU", "vMemory"],
+                "total_sheets": 3,
+                "conversion_timestamp": "2025-08-21T10:30:00Z",
+                "data": {
+                    "vInfo": {
+                        "data": [{"VM": "VM-001", "Power": "poweredOn"}],
+                        "row_count": 1,
+                        "column_count": 2,
+                        "columns": ["VM", "Power"]
+                    }
+                }
+            }
+        }
+    )
+
+
 # Constants
 class ESXVersionThresholds:
     """ESX version thresholds for risk assessment."""

@@ -73,6 +73,8 @@ class APIEndpointsConfig:
     web_ui: str = "/"
     analyze: str = "/api/analyze"
     analyze_upload: str = "/api/analyze-upload"
+    analyze_json: str = "/api/analyze-json"
+    convert_to_json: str = "/api/convert-to-json"
     available_risks: str = "/api/risks"
     sku_capabilities: str = "/api/sku"
     health: str = "/health"

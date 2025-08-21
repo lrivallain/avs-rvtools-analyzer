@@ -163,14 +163,47 @@ uv run avs-rvtools-analyzer --host 0.0.0.0 --port 9000
 - **Health Check**: System status at `/health`
 - **MCP Tools**: AI integration endpoints for automated analysis
 
+#### API Endpoints
+
+The application provides several REST API endpoints:
+
+**Analysis Endpoints:**
+
+- `POST /api/analyze` - Analyze RVTools file by server file path
+- `POST /api/analyze-upload` - Upload and analyze RVTools Excel file
+- `POST /api/analyze-json` - Analyze JSON data for migration risks
+
+**Data Conversion:**
+
+- `POST /api/convert-to-json` - Convert uploaded Excel file to JSON format
+
+**Information Endpoints:**
+
+- `GET /api/risks` - List all available risk assessments
+- `GET /api/sku` - Get Azure VMware Solution SKU capabilities
+- `GET /api/info` - Server information and available endpoints
+- `GET /health` - Health check status
+
+#### AI Integration Workflow
+
+For AI models and automated analysis, the application supports a flexible workflow:
+
+1. **Excel to JSON Conversion**: Use `/api/convert-to-json` to convert RVTools Excel files into structured JSON data
+2. **JSON Data Analysis**: Use `/api/analyze-json` to analyze the converted JSON data for migration risks
+3. **Direct Analysis**: Alternatively, use `/api/analyze-upload` for direct file analysis without conversion
+
+This workflow enables AI models to process RVTools data in multiple formats and provides maximum flexibility for automated migration assessments.
+
 ### MCP Tools for AI Integration
 
 The application exposes MCP tools for AI assistants:
 
 1. **`analyze_file`**: Analyze RVTools file by providing a file path on the server.
 2. **`analyze_uploaded_file`**: Upload and analyze RVTools Excel file.
-3. **`list_available_risks`**: List all migration risks that can be assessed by this tool.
-4. **`get_sku_capabilities`**: Get Azure VMware Solution (AVS) SKU hardware capabilities and specifications.
+3. **`analyze_json_data`**: Analyze JSON data for migration risks and compatibility issues.
+4. **`convert_excel_to_json`**: Convert Excel file to JSON format for AI model consumption.
+5. **`list_available_risks`**: List all migration risks that can be assessed by this tool.
+6. **`get_sku_capabilities`**: Get Azure VMware Solution (AVS) SKU hardware capabilities and specifications.
 
 ## Contributing
 

@@ -1,14 +1,39 @@
 """
 Web UI routes for AVS RVTools Analyzer.
 """
+import json
+from datetime import datetime
 from typing import Any
 
 from fastapi import FastAPI, File, UploadFile, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
 
 from ..services import FileService, AnalysisService
 from ..config import AppConfig
+
+
+def json_serializer(obj):
+    """JSON serializer for objects not serializable by default json code"""
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    elif hasattr(obj, '__dict__'):
+        return obj.__dict__
+    else:
+        return str(obj)
+
+
+def clean_value_for_json(value):
+    """Clean a single value for JSON serialization"""
+    if value is None:
+        return ''
+    elif isinstance(value, datetime):
+        return value.isoformat()
+    elif isinstance(value, (int, float, str, bool)):
+        return value
+    else:
+        # Convert other types to string
+        return str(value)
 
 
 def setup_web_routes(
@@ -106,6 +131,64 @@ def setup_web_routes(
                     context={
                         "filename": file.filename,
                         "risk_results": risk_results,
+                    }
+                )
+
+            finally:
+                # Clean up temp file
+                file_service.cleanup_temp_file(temp_file_path)
+
+        except Exception as e:
+            return templates.TemplateResponse(
+                request=request,
+                name="error.html",
+                context={"message": str(e)}
+            )
+
+    @app.post("/convert-to-json", tags=["Web UI"], summary="Convert to JSON", description="Upload and convert RVTools Excel file to JSON format for download")
+    async def convert_to_json(request: Request, file: UploadFile = File(...)):
+        """Upload and convert RVTools Excel file to JSON format for download."""
+        try:
+            # Validate file
+            file_service.validate_file(file)
+
+            # Save uploaded file
+            temp_file_path = await file_service.save_uploaded_file(file)
+
+            try:
+                # Load Excel file
+                excel_data = file_service.load_excel_file(temp_file_path)
+
+                # Convert to JSON format - simplified output just like the API
+                json_result = {}
+                for sheet_name, sheet_info in excel_data.items():
+                    # Get the data from the sheet
+                    sheet_data = sheet_info.get('data', [])
+
+                    # Remove rows where all values are None/empty
+                    filtered_data = []
+                    for row in sheet_data:
+                        if any(value is not None and str(value).strip() != '' for value in row.values()):
+                            # Clean each value for JSON serialization
+                            cleaned_row = {k: clean_value_for_json(v) for k, v in row.items()}
+                            filtered_data.append(cleaned_row)
+
+                    # Store only the data for this sheet
+                    json_result[sheet_name] = filtered_data
+
+                # Convert to JSON string with nice formatting
+                json_content = json.dumps(json_result, indent=2, ensure_ascii=False, default=json_serializer)
+
+                # Create filename based on original file
+                original_name = file.filename.rsplit('.', 1)[0] if file.filename else 'rvtools_export'
+                json_filename = f"{original_name}.json"
+
+                # Return as downloadable JSON file
+                return Response(
+                    content=json_content,
+                    media_type="application/json",
+                    headers={
+                        "Content-Disposition": f"attachment; filename={json_filename}"
                     }
                 )
 
