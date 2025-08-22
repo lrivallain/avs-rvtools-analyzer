@@ -32,10 +32,10 @@ from avs_rvtools_analyzer.risk_detection import (
 def comprehensive_excel_data():
     """Load the comprehensive test data Excel file."""
     test_data_path = Path(__file__).parent / 'test-data' / 'comprehensive_test_data.xlsx'
-    
+
     # The file should already exist due to the session-scoped fixture in conftest.py
     assert test_data_path.exists(), f"Test data file should exist at {test_data_path}"
-    
+
     return pd.ExcelFile(test_data_path)
 
 

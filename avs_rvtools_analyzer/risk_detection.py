@@ -102,17 +102,17 @@ def detect_risky_disks(excel_data: pd.ExcelFile) -> Dict[str, Any]:
         return {'count': 0, 'data': []}
 
     vdisk_data = excel_data.parse('vDisk')
-    
+
     # Filter using string comparison directly - no copy needed
     mask = (
         (vdisk_data['Raw'].astype(str).str.lower() == 'true') |
         (vdisk_data['Disk Mode'] == 'independent_persistent')
     )
-    
+
     # Select only columns that exist in the data
     columns_to_return = ['VM', 'Powerstate', 'Disk', 'Capacity MiB', 'Raw', 'Disk Mode']
     available_columns = [col for col in columns_to_return if col in vdisk_data.columns]
-    
+
     risky_disks = vdisk_data[mask][available_columns].to_dict(orient='records')
 
     return {
@@ -233,7 +233,7 @@ def detect_dvport_issues(excel_data: pd.ExcelFile) -> Dict[str, Any]:
         return {'count': 0, 'data': []}
 
     dvport_data = excel_data.parse('dvPort')
-    
+
     # Store original VLAN nulls before filling
     vlan_is_null = dvport_data['VLAN'].isnull()
     dvport_data['VLAN'] = dvport_data['VLAN'].fillna(0).astype(int)
@@ -245,11 +245,11 @@ def detect_dvport_issues(excel_data: pd.ExcelFile) -> Dict[str, Any]:
         (dvport_data['Mac Changes'].astype(str).str.lower() == 'true') |
         (dvport_data['Forged Transmits'].astype(str).str.lower() == 'true')
     )
-    
+
     # Return original values directly
     columns_to_return = ['Port', 'Switch', 'Object ID', 'VLAN', 'Allow Promiscuous', 'Mac Changes', 'Forged Transmits']
     available_columns = [col for col in columns_to_return if col in dvport_data.columns]
-    
+
     issues = dvport_data[mask][available_columns].to_dict(orient='records')
 
     return {
@@ -316,14 +316,14 @@ def detect_cdrom_issues(excel_data: pd.ExcelFile) -> Dict[str, Any]:
         return {'count': 0, 'data': []}
 
     vcd_data = excel_data.parse('vCD')
-    
+
     # Filter using string comparison directly - no copy needed
     mask = vcd_data['Connected'].astype(str).str.lower() == 'true'
-    
+
     # Select only columns that exist in the data
     columns_to_return = ['VM', 'Powerstate', 'Connected', 'Starts Connected', 'Device Type']
     available_columns = [col for col in columns_to_return if col in vcd_data.columns]
-    
+
     cdrom_issues = vcd_data[mask][available_columns].to_dict(orient='records')
 
     return {
