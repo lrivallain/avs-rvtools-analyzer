@@ -129,24 +129,43 @@ def detect_risky_disks(excel_data: pd.ExcelFile) -> Dict[str, Any]:
 )
 def detect_non_dvs_switches(excel_data: pd.ExcelFile) -> Dict[str, Any]:
     """Detect non-dvSwitch network interfaces."""
-    if 'dvSwitch' not in excel_data.sheet_names or 'vNetwork' not in excel_data.sheet_names:
-        return {'count': 0, 'data': {}}
+    if 'vNetwork' not in excel_data.sheet_names:
+        return {'count': 0, 'data': []}
 
-    dvswitch_data = excel_data.parse('dvSwitch')
     vnetwork_data = excel_data.parse('vNetwork')
 
-    dvswitch_list = dvswitch_data['Switch'].dropna().unique()
+    # Filter out rows with empty or null Switch values
+    vnetwork_data = vnetwork_data[vnetwork_data['Switch'].notna() & (vnetwork_data['Switch'] != '')]
+
+    # Get list of distributed switches (empty list if no dvSwitch sheet exists)
+    dvswitch_list = []
+    if 'dvSwitch' in excel_data.sheet_names:
+        dvswitch_data = excel_data.parse('dvSwitch')
+        if 'Switch' in dvswitch_data.columns:
+            dvswitch_list = dvswitch_data['Switch'].dropna().unique()
+            logger.info(f"Found distributed switches: {list(dvswitch_list)}")
+
+    # Add Switch Type classification
     vnetwork_data['Switch Type'] = vnetwork_data['Switch'].apply(
-        lambda x: 'standard vSwitch' if x not in dvswitch_list else x
+        lambda x: 'Standard' if x not in dvswitch_list else 'Distributed'
     )
 
-    switch_statistics = vnetwork_data['Switch Type'].value_counts().to_dict()
-    non_dvs_count = len(vnetwork_data[vnetwork_data['Switch Type'] == 'standard vSwitch'])
+    # Count ports per switch with switch type
+    switch_summary = vnetwork_data.groupby(['Switch', 'Switch Type']).size().reset_index(name='Port Count')
 
-    return {
-        'count': non_dvs_count,
-        'data': switch_statistics
-    }
+    # Convert to list of dictionaries for consistent API response
+    switch_data = switch_summary.to_dict(orient='records')
+
+    # Count VMs using non-distributed switches (individual ports/VMs)
+    non_dvs_vm_count = len(vnetwork_data[vnetwork_data['Switch Type'] == 'Standard'])
+
+    if non_dvs_vm_count > 0:
+        return {
+            'count': non_dvs_vm_count,  # Count of VMs using standard switches
+            'data': switch_data         # Summary data by switch
+        }
+    else:
+        return {'count': 0, 'data': []}
 
 
 @risk_info(
