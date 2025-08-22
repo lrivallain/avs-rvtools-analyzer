@@ -1,45 +1,32 @@
 import pytest
-from avs_rvtools_analyzer.main import app
+from pathlib import Path
 import pandas as pd
-from io import BytesIO
+import sys
+
+# Add the project root to the Python path
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
+
+@pytest.fixture(scope="session", autouse=True)
+def ensure_test_data_exists():
+    """Ensure comprehensive test data exists before running any tests."""
+    test_data_path = Path(__file__).parent / 'test-data' / 'comprehensive_test_data.xlsx'
+    
+    if not test_data_path.exists():
+        # Create the test-data directory if it doesn't exist
+        test_data_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Generate test data
+        from create_test_data import create_comprehensive_test_data
+        print(f"Generating comprehensive test data at {test_data_path}...")
+        create_comprehensive_test_data()
+        print("Test data generated successfully!")
+    
+    return test_data_path
+
 
 @pytest.fixture
-def client():
-    app.config['TESTING'] = True
-    with app.test_client() as client:
-        yield client
-
-@pytest.fixture
-def fake_excel_data():
-    # Create a fake Excel file with multiple sheets
-    data = {
-        'vHost': pd.DataFrame({
-            'ESX Version': ['6.7.0', '7.0.0'],
-            'CPU Model': ['Intel Xeon', 'AMD Ryzen'],
-            'Host': ['Host1', 'Host2'],
-            'Datacenter': ['DC1', 'DC2'],
-            'Cluster': ['Cluster1', 'Cluster2'],
-            '# VMs': [10, 5]
-        }),
-        'vUSB': pd.DataFrame({
-            'VM': ['VM1', 'VM2'],
-            'Powerstate': ['poweredOn', 'poweredOff'],
-            'Device Type': ['USB Controller', 'USB Device'],
-            'Connected': [True, False]
-        }),
-        'vDisk': pd.DataFrame({
-            'VM': ['VM1', 'VM2'],
-            'Powerstate': ['poweredOn', 'poweredOff'],
-            'Disk': ['Disk1', 'Disk2'],
-            'Capacity MiB': [1024, 2048],
-            'Raw': [True, False],
-            'Disk Mode': ['independent_persistent', 'persistent']
-        })
-    }
-
-    output = BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        for sheet_name, df in data.items():
-            df.to_excel(writer, sheet_name=sheet_name, index=False)
-    output.seek(0)
-    return output
+def comprehensive_test_data_path():
+    """Provide the path to comprehensive test data."""
+    return Path(__file__).parent / 'test-data' / 'comprehensive_test_data.xlsx'
