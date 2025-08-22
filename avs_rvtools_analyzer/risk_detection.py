@@ -8,6 +8,7 @@ import pandas as pd
 
 # Import from our new modules
 from .models import RiskLevel, ESXVersionThresholds, PowerStates, GuestStates, NetworkConstants, StorageConstants
+from .config import MigrationMethodsConfig
 from .helpers import (
     load_sku_data, safe_sheet_access, create_empty_result,
     filter_dataframe_by_condition, get_risk_category, convert_mib_to_tb,
@@ -414,6 +415,73 @@ def detect_high_memory_vms(excel_data: pd.ExcelFile) -> Dict[str, Any]:
     }
 
 
+@risk_info(
+    level=RiskLevel.BLOCKING,
+    description="""Virtual machines with legacy hardware version have limited HCX migration capabilities to Azure VMware Solution.
+    Hardware version determines the virtual machine's feature set and migration compatibility.""",
+    alert_message="""You should consider upgrading the hardware version of these VMs before migration.
+    This requires powering off the VM temporarily."""
+)
+def detect_hw_version_compatibility(excel_data: pd.ExcelFile) -> Dict[str, Any]:
+    """Detect VMs with incompatible hardware versions for Azure VMware Solution migration."""
+    vm_data = safe_sheet_access(excel_data, 'vInfo')
+    if vm_data is None:
+        return create_empty_result()
+
+    # Check if HW version column exists
+    if 'HW version' not in vm_data.columns:
+        logger.warning("HW version column not found in vInfo sheet")
+        return create_empty_result()
+
+    # Filter VMs with hardware version issues
+    incompatible_vms = []
+
+    for _, vm in vm_data.iterrows():
+        hw_version = vm.get('HW version')
+        if pd.isna(hw_version):
+            continue
+
+        try:
+            # Convert to numeric value
+            hw_version_num = int(hw_version)
+
+            # Get migration configuration
+            migration_config = MigrationMethodsConfig()
+
+            # Determine unsupported migration methods based on HW version
+            unsupported_methods = []
+
+            # Check if HW version is below minimum supported version
+            if hw_version_num < migration_config.minimum_supported_hw_version:
+                unsupported_methods = [migration_config.all_methods_unsupported_message]
+            else:
+                # Check each migration method against its minimum requirement
+                for method_name, min_hw_version in migration_config.migration_methods.items():
+                    if hw_version_num < min_hw_version:
+                        unsupported_methods.append(method_name)
+
+            # Only include VMs with migration limitations
+            if unsupported_methods:
+                vm_info = {
+                    'VM': vm.get('VM', 'Unknown'),
+                    'HW Version': hw_version,
+                    'Powerstate': vm.get('Powerstate', 'Unknown'),
+                    'Unsupported migration methods': ', '.join(unsupported_methods)
+                }
+                incompatible_vms.append(vm_info)
+
+        except (ValueError, TypeError) as e:
+            logger.error(f"Could not parse hardware version '{hw_version}' for VM {vm.get('VM', 'Unknown')}: {e}")
+            continue
+
+    logger.info(f"Found {len(incompatible_vms)} VMs with hardware version compatibility issues")
+
+    return {
+        'count': len(incompatible_vms),
+        'data': incompatible_vms
+    }
+
+
 ########################################################################################################################
 #                                                                                                                      #
 #                                         End of Risk Detection Functions                                              #
@@ -442,6 +510,7 @@ def get_available_risks() -> Dict[str, Any]:
         detect_large_provisioned_vms,
         detect_high_vcpu_vms,
         detect_high_memory_vms,
+        detect_hw_version_compatibility,
     ]
 
     available_risks = {}
@@ -499,6 +568,7 @@ def gather_all_risks(excel_data: pd.ExcelFile) -> Dict[str, Any]:
         detect_large_provisioned_vms,
         detect_high_vcpu_vms,
         detect_high_memory_vms,
+        detect_hw_version_compatibility,
     ]
 
     results = {}

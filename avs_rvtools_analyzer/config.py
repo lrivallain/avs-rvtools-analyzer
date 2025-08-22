@@ -90,6 +90,23 @@ class MCPConfig:
 
 
 @dataclass
+class MigrationMethodsConfig:
+    """Configuration for migration methods and their minimum hardware version requirements."""
+
+    # Migration methods with their minimum required HW version
+    migration_methods: Dict[str, int] = field(default_factory=lambda: {
+        "HCX vMotion": 9,
+        "Cold Migration": 9,
+        "Replication Assisted vMotion": 9,
+        "Bulk Migration": 7
+    })
+
+    # Special handling for very old versions
+    minimum_supported_hw_version: int = 7
+    all_methods_unsupported_message: str = "All migration methods (HW version too old)"
+
+
+@dataclass
 class AppConfig:
     """Main application configuration container."""
     server: ServerConfig = field(default_factory=ServerConfig)
@@ -99,6 +116,7 @@ class AppConfig:
     paths: PathConfig = field(default_factory=PathConfig)
     endpoints: APIEndpointsConfig = field(default_factory=APIEndpointsConfig)
     mcp: MCPConfig = field(default_factory=MCPConfig)
+    migration: MigrationMethodsConfig = field(default_factory=MigrationMethodsConfig)
 
     def get_endpoint_urls(self, host: str = None, port: int = None) -> Dict[str, str]:
         """Generate full URLs for all endpoints."""
