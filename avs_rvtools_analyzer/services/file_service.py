@@ -6,7 +6,7 @@ import tempfile
 from pathlib import Path
 from typing import Set, Optional, Dict, Any
 import pandas as pd
-from fastapi import UploadFile
+from fastapi import UploadFile, HTTPException
 import xlrd
 import openpyxl
 from zipfile import BadZipFile
@@ -119,7 +119,7 @@ class FileService:
         try:
             # Check if file exists
             if not file_path.exists():
-                raise FileValidationError(f"File not found: {file_path}", file_type="Excel")
+                raise FileValidationError(f"File not found: {file_path}")
 
             logger.debug(f"Loading Excel file: {file_path}")
 
@@ -194,7 +194,7 @@ class FileService:
                 except xlrd.XLRDError as e:
                     if "password" in str(e).lower() or "encrypted" in str(e).lower():
                         raise ProtectedFileError("File appears to be password protected")
-                    raise FileValidationError(f"Error reading Excel file: {str(e)}", file_type="Excel")
+                    raise FileValidationError(f"Error reading Excel file: {str(e)}")
 
         except (ProtectedFileError, FileValidationError):
             # Re-raise our custom exceptions
@@ -258,20 +258,21 @@ class FileService:
                     operation="cleanup"
                 )
 
-    def get_excel_sheets_data(self, excel_data: pd.ExcelFile) -> dict:
+    def get_excel_sheets_data(self, excel_data: Dict[str, Any]) -> dict:
         """
-        Extract all sheets data from Excel file.
+        Extract all sheets data from Excel file data.
 
         Args:
-            excel_data: Parsed Excel file
+            excel_data: Dictionary containing sheet data from load_excel_file
 
         Returns:
             Dictionary containing data from all sheets
         """
         sheets = {}
         try:
-            for sheet_name in excel_data.sheet_names:
-                sheets[sheet_name] = excel_data.parse(sheet_name).to_dict(orient='records')
+            for sheet_name, sheet_info in excel_data.items():
+                # Extract just the data from each sheet
+                sheets[sheet_name] = sheet_info.get('data', [])
             return sheets
 
         except Exception as e:
