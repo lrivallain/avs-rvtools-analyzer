@@ -9,7 +9,7 @@ A unified FastAPI application for analyzing RVTools data with both web interface
 - **AI Integration**: MCP server capabilities for AI assistants to analyze migration risks
 - **Risk Assessment**: Comprehensive analysis of 14 migration risk categories:
   - vUSB devices (blocking)
-  - Risky disks (blocking)
+  - Risky disks (dynamic)
   - Non-dvSwitch networks (blocking)
   - High vCPU/memory VMs (blocking)
   - VM snapshots (warning)
