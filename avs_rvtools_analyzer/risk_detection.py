@@ -244,6 +244,7 @@ def detect_oracle_vms(excel_data: pd.ExcelFile) -> Dict[str, Any]:
         <li>Allow Promiscuous mode enabled</li>
         <li>Mac Changes enabled</li>
         <li>Forged Transmits enabled</li>
+        <li>Ephemeral binding: VMs will be migrated with NIC being disconnected</li>
     </ul>"""
 )
 def detect_dvport_issues(excel_data: pd.ExcelFile) -> Dict[str, Any]:
@@ -262,11 +263,12 @@ def detect_dvport_issues(excel_data: pd.ExcelFile) -> Dict[str, Any]:
         vlan_is_null |
         (dvport_data['Allow Promiscuous'].astype(str).str.lower() == 'true') |
         (dvport_data['Mac Changes'].astype(str).str.lower() == 'true') |
-        (dvport_data['Forged Transmits'].astype(str).str.lower() == 'true')
+        (dvport_data['Forged Transmits'].astype(str).str.lower() == 'true') |
+        (dvport_data['Type'].astype(str).str.lower() == 'ephemeral')
     )
 
     # Return original values directly
-    columns_to_return = ['Port', 'Switch', 'Object ID', 'VLAN', 'Allow Promiscuous', 'Mac Changes', 'Forged Transmits']
+    columns_to_return = ['Port', 'Switch', 'Object ID', 'VLAN', 'Allow Promiscuous', 'Mac Changes', 'Forged Transmits', 'Type']
     available_columns = [col for col in columns_to_return if col in dvport_data.columns]
 
     issues = dvport_data[mask][available_columns].to_dict(orient='records')

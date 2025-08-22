@@ -281,10 +281,16 @@ class TestDVPortRiskDetection:
         promiscuous_issues = [issue for issue in dvport_issues if str(issue.get('Allow Promiscuous', '')).lower() == 'true']
         mac_change_issues = [issue for issue in dvport_issues if str(issue.get('Mac Changes', '')).lower() == 'true']
         forged_transmit_issues = [issue for issue in dvport_issues if str(issue.get('Forged Transmits', '')).lower() == 'true']
+        ephemeral_issues = [issue for issue in dvport_issues if str(issue.get('Type', '')).lower() == 'ephemeral']
 
         assert len(promiscuous_issues) > 0, "Should find promiscuous mode issues"
         assert len(mac_change_issues) > 0, "Should find MAC change issues"
         assert len(forged_transmit_issues) > 0, "Should find forged transmit issues"
+        assert len(ephemeral_issues) > 0, "Should find ephemeral port type issues"
+        
+        # Verify that all dvPort results include the Type column
+        for issue in dvport_issues:
+            assert 'Type' in issue, "All dvPort results should include Type column"
 
 
 class TestNonIntelHostRiskDetection:

@@ -247,17 +247,18 @@ def create_comprehensive_test_data():
     sheets_data['dvPort'] = pd.DataFrame({
         'VM': [
             'vm-web-server-01', 'vm-db-oracle-01', 'vm-risky-port-01', 'vm-risky-port-02',
-            'vm-app-server-01', 'vm-security-risk-01', 'vm-baseline-good'
+            'vm-app-server-01', 'vm-security-risk-01', 'vm-ephemeral-risk-01', 'vm-ephemeral-risk-02', 'vm-baseline-good'
         ],
-        'Port': ['50000001', '50000002', '50000003', '50000004', '50000005', '50000006', '50000007'],
-        'Switch': ['dvSwitch-01'] * 7,
-        'Object ID': ['1001', '1002', '1003', '1004', '1005', '1006', '1007'],
-        'VLAN': [100, None, 200, None, 300, 400, 500],  # Null VLANs (risk)
-        'Allow Promiscuous': ['False', 'True', 'False', 'False', 'False', 'True', 'False'],  # Promiscuous mode (risk)
-        'Mac Changes': ['False', 'False', 'True', 'False', 'False', 'True', 'False'],  # MAC changes (risk)
-        'Forged Transmits': ['False', 'True', 'False', 'True', 'False', 'True', 'False'],  # Forged transmits (risk)
-        'Connected': [True, True, False, True, True, True, True],
-        'Status': ['Connected', 'Connected', 'Disconnected', 'Connected', 'Connected', 'Connected', 'Connected']
+        'Port': ['50000001', '50000002', '50000003', '50000004', '50000005', '50000006', '50000007', '50000008', '50000009'],
+        'Switch': ['dvSwitch-01'] * 9,
+        'Object ID': ['1001', '1002', '1003', '1004', '1005', '1006', '1007', '1008', '1009'],
+        'Type': ['static', 'static', 'ephemeral', 'ephemeral', 'static', 'static', 'ephemeral', 'ephemeral', 'static'],  # Ephemeral types (HCX migration risk)
+        'VLAN': [100, None, 200, None, 300, 400, 500, 600, 700],  # Null VLANs (risk)
+        'Allow Promiscuous': ['False', 'True', 'False', 'False', 'False', 'True', 'False', 'False', 'False'],  # Promiscuous mode (risk)
+        'Mac Changes': ['False', 'False', 'True', 'False', 'False', 'True', 'False', 'False', 'False'],  # MAC changes (risk)
+        'Forged Transmits': ['False', 'True', 'False', 'True', 'False', 'True', 'False', 'False', 'False'],  # Forged transmits (risk)
+        'Connected': [True, True, False, True, True, True, True, True, True],
+        'Status': ['Connected', 'Connected', 'Disconnected', 'Connected', 'Connected', 'Connected', 'Connected', 'Connected', 'Connected']
     })
 
     # vCD sheet - for CD-ROM device risks
