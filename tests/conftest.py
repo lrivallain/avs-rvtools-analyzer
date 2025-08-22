@@ -17,6 +17,11 @@ def ensure_test_data_exists():
     """Ensure comprehensive test data exists before running tests."""
     test_data_path = Path(__file__).parent / "test-data" / "comprehensive_test_data.xlsx"
 
+    # Test folder exists
+    if not test_data_path.parent.exists():
+        test_data_path.parent.mkdir(parents=True)
+
+    # Test data file exists
     if not test_data_path.exists():
         # Import and run the test data creation script
         sys.path.append(str(Path(__file__).parent))
