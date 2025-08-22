@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """
-Comprehensive tests for all risk detection functions using the generated test data.
+Individual Risk Detection Tests
+
+Tests each risk detection function independently to ensure proper functionality.
 """
 
 import pytest
 import pandas as pd
+import tempfile
 from pathlib import Path
 
 # Import all risk detection functions
@@ -24,23 +27,11 @@ from avs_rvtools_analyzer.risk_detection import (
     detect_high_vcpu_vms,
     detect_high_memory_vms,
     detect_hw_version_compatibility,
-    gather_all_risks
 )
 
 
-@pytest.fixture(scope="module")
-def comprehensive_excel_data():
-    """Load the comprehensive test data Excel file."""
-    test_data_path = Path(__file__).parent / 'test-data' / 'comprehensive_test_data.xlsx'
-
-    # The file should already exist due to the session-scoped fixture in conftest.py
-    assert test_data_path.exists(), f"Test data file should exist at {test_data_path}"
-
-    return pd.ExcelFile(test_data_path)
-
-
-class TestESXVersions:
-    """Test ESX version detection."""
+class TestESXVersionRiskDetection:
+    """Test ESX version risk detection individually."""
 
     def test_detect_esx_versions_finds_old_versions(self, comprehensive_excel_data):
         """Test that old ESX versions are detected."""
@@ -63,8 +54,8 @@ class TestESXVersions:
         assert isinstance(result['count'], int)
 
 
-class TestUSBDevices:
-    """Test USB device detection."""
+class TestUSBDeviceRiskDetection:
+    """Test USB device risk detection individually."""
 
     def test_detect_vusb_devices_finds_devices(self, comprehensive_excel_data):
         """Test that USB devices are detected."""
@@ -95,8 +86,8 @@ class TestUSBDevices:
             assert vm in vm_names, f"Should detect USB device on {vm}"
 
 
-class TestRiskyDisks:
-    """Test risky disk detection."""
+class TestRiskyDiskRiskDetection:
+    """Test risky disk risk detection individually."""
 
     def test_detect_risky_disks_finds_raw_disks(self, comprehensive_excel_data):
         """Test that raw device mapping disks are detected."""
@@ -114,8 +105,8 @@ class TestRiskyDisks:
         assert len(independent_disks) > 0, "Should find independent mode disks"
 
 
-class TestNetworkSwitches:
-    """Test network switch detection."""
+class TestNetworkSwitchRiskDetection:
+    """Test network switch risk detection individually."""
 
     def test_detect_non_dvs_switches_finds_standard_switches(self, comprehensive_excel_data):
         """Test that standard vSwitches are detected."""
@@ -123,14 +114,98 @@ class TestNetworkSwitches:
 
         assert result['count'] > 0, "Should detect standard vSwitches"
         assert 'data' in result
+        assert isinstance(result['data'], list), "Data should be a list of switch records"
 
-        # Should find standard vSwitches (vSwitch0, vSwitch1, vSwitch2)
+        # Should find switches with detailed information
         switch_data = result['data']
-        assert 'standard vSwitch' in switch_data, "Should categorize standard vSwitches"
+
+        # Verify structure of switch data
+        for switch_record in switch_data:
+            assert 'Switch' in switch_record, "Each record should have Switch name"
+            assert 'Switch Type' in switch_record, "Each record should have Switch Type"
+            assert 'Port Count' in switch_record, "Each record should have Port Count"
+            assert switch_record['Switch Type'] in ['Standard', 'Distributed'], "Switch Type should be Standard or Distributed"
+            assert isinstance(switch_record['Port Count'], int), "Port Count should be an integer"
+
+        # Should find at least some standard switches
+        standard_switches = [switch for switch in switch_data if switch['Switch Type'] == 'Standard']
+        assert len(standard_switches) > 0, "Should find at least one standard vSwitch"
+
+        # Check for expected standard switch names (vSwitch0, vSwitch1, vSwitch2 from test data)
+        standard_switch_names = [switch['Switch'] for switch in standard_switches]
+        expected_standard_switches = ['vSwitch0', 'vSwitch1', 'vSwitch2']
+
+        for expected_switch in expected_standard_switches:
+            assert expected_switch in standard_switch_names, f"Should detect {expected_switch} as standard vSwitch"
+
+    def test_detect_non_dvs_switches_only_standard_switches(self):
+        """Test detection when there are only standard vSwitches and no distributed switches."""
+        # Create test data with only standard vSwitches (no dvSwitch sheet)
+        with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as tmp_file:
+            temp_path = Path(tmp_file.name)
+
+            # Create vNetwork data with only standard vSwitches
+            vnetwork_data = pd.DataFrame({
+                'VM': [
+                    'vm-web-01', 'vm-web-02', 'vm-app-01', 'vm-app-02',
+                    'vm-db-01', 'vm-db-02', 'vm-test-01', 'vm-empty-switch'
+                ],
+                'Network Label': [
+                    'VM Network', 'Management Network', 'Storage Network', 'Production Network',
+                    'Database Network', 'Backup Network', 'Test Network', 'Disconnected'
+                ],
+                'Switch': [
+                    'vSwitch0', 'vSwitch0', 'vSwitch1', 'vSwitch1',
+                    'vSwitch2', 'vSwitch2', 'vSwitch3', ''  # Last one has empty switch
+                ],
+                'Connected': [True, True, True, True, True, True, True, False],
+                'Status': ['Connected'] * 7 + ['Disconnected']
+            })
+
+            # Write to Excel file
+            with pd.ExcelWriter(temp_path, engine='openpyxl') as writer:
+                vnetwork_data.to_excel(writer, sheet_name='vNetwork', index=False)
+
+        try:
+            # Load the test data
+            excel_data = pd.ExcelFile(temp_path)
+
+            # Test the function
+            result = detect_non_dvs_switches(excel_data)
+
+            # Should detect all VMs with non-empty switches as using standard vSwitches
+            assert result['count'] == 7, f"Should detect 7 VMs using standard switches (excluding empty switch), got {result['count']}"
+            assert 'data' in result
+            assert isinstance(result['data'], list)
+
+            switch_data = result['data']
+
+            # All switches should be classified as 'Standard'
+            for switch_record in switch_data:
+                assert switch_record['Switch Type'] == 'Standard', f"All switches should be Standard, got {switch_record['Switch Type']} for {switch_record['Switch']}"
+
+            # Should find 4 different vSwitches (vSwitch0, vSwitch1, vSwitch2, vSwitch3)
+            switch_names = [switch['Switch'] for switch in switch_data]
+            expected_switches = ['vSwitch0', 'vSwitch1', 'vSwitch2', 'vSwitch3']
+
+            assert len(switch_names) == 4, f"Should find 4 different switches, got {len(switch_names)}"
+            for expected_switch in expected_switches:
+                assert expected_switch in switch_names, f"Should find {expected_switch} in results"
+
+            # Verify port counts
+            port_counts = {switch['Switch']: switch['Port Count'] for switch in switch_data}
+            assert port_counts['vSwitch0'] == 2, "vSwitch0 should have 2 ports"
+            assert port_counts['vSwitch1'] == 2, "vSwitch1 should have 2 ports"
+            assert port_counts['vSwitch2'] == 2, "vSwitch2 should have 2 ports"
+            assert port_counts['vSwitch3'] == 1, "vSwitch3 should have 1 port"
+
+        finally:
+            # Clean up temporary file
+            temp_path.unlink(missing_ok=True)
 
 
-class TestSnapshots:
-    """Test snapshot detection."""
+class TestSnapshotRiskDetection:
+    """Test snapshot risk detection individually."""
 
     def test_detect_snapshots_finds_snapshots(self, comprehensive_excel_data):
         """Test that VM snapshots are detected."""
@@ -151,8 +226,8 @@ class TestSnapshots:
             assert 'Date / time' in snapshot
 
 
-class TestSuspendedVMs:
-    """Test suspended VM detection."""
+class TestSuspendedVMRiskDetection:
+    """Test suspended VM risk detection individually."""
 
     def test_detect_suspended_vms_finds_suspended(self, comprehensive_excel_data):
         """Test that suspended VMs are detected."""
@@ -170,8 +245,8 @@ class TestSuspendedVMs:
             assert vm in vm_names, f"Should detect {vm} as suspended"
 
 
-class TestOracleVMs:
-    """Test Oracle VM detection."""
+class TestOracleVMRiskDetection:
+    """Test Oracle VM risk detection individually."""
 
     def test_detect_oracle_vms_finds_oracle(self, comprehensive_excel_data):
         """Test that Oracle VMs are detected."""
@@ -189,8 +264,8 @@ class TestOracleVMs:
             assert vm in vm_names, f"Should detect {vm} as Oracle VM"
 
 
-class TestDVPortIssues:
-    """Test distributed virtual port issues."""
+class TestDVPortRiskDetection:
+    """Test distributed virtual port risk detection individually."""
 
     def test_detect_dvport_issues_finds_security_issues(self, comprehensive_excel_data):
         """Test that dvPort security issues are detected."""
@@ -212,8 +287,8 @@ class TestDVPortIssues:
         assert len(forged_transmit_issues) > 0, "Should find forged transmit issues"
 
 
-class TestNonIntelHosts:
-    """Test non-Intel host detection."""
+class TestNonIntelHostRiskDetection:
+    """Test non-Intel host risk detection individually."""
 
     def test_detect_non_intel_hosts_finds_amd(self, comprehensive_excel_data):
         """Test that non-Intel hosts are detected."""
@@ -229,8 +304,8 @@ class TestNonIntelHosts:
         assert any('AMD' in cpu for cpu in cpu_models), "Should detect AMD hosts"
 
 
-class TestVMToolsIssues:
-    """Test VMware Tools detection."""
+class TestVMToolsRiskDetection:
+    """Test VMware Tools risk detection individually."""
 
     def test_detect_vmtools_not_running_finds_issues(self, comprehensive_excel_data):
         """Test that VMware Tools issues are detected."""
@@ -248,8 +323,8 @@ class TestVMToolsIssues:
             assert issue['Guest state'] == 'notRunning'
 
 
-class TestCDROMIssues:
-    """Test CD-ROM device detection."""
+class TestCDROMRiskDetection:
+    """Test CD-ROM device risk detection individually."""
 
     def test_detect_cdrom_issues_finds_connected_cdroms(self, comprehensive_excel_data):
         """Test that connected CD-ROM devices are detected."""
@@ -267,8 +342,8 @@ class TestCDROMIssues:
             assert connected_value == 'true', f"Should only detect VMs with connected CD-ROMs, got: {issue['Connected']}"
 
 
-class TestLargeProvisionedVMs:
-    """Test large provisioned VM detection."""
+class TestLargeProvisionedVMRiskDetection:
+    """Test large provisioned VM risk detection individually."""
 
     def test_detect_large_provisioned_vms_finds_large_vms(self, comprehensive_excel_data):
         """Test that large provisioned VMs are detected."""
@@ -287,8 +362,8 @@ class TestLargeProvisionedVMs:
             assert vm in vm_names, f"Should detect {vm} as large provisioned VM"
 
 
-class TestHighVCPUVMs:
-    """Test high vCPU VM detection."""
+class TestHighVCPURiskDetection:
+    """Test high vCPU VM risk detection individually."""
 
     def test_detect_high_vcpu_vms_finds_high_cpu_vms(self, comprehensive_excel_data):
         """Test that high vCPU VMs are detected."""
@@ -307,8 +382,8 @@ class TestHighVCPUVMs:
             assert vm in vm_names, f"Should detect {vm} as high vCPU VM"
 
 
-class TestHighMemoryVMs:
-    """Test high memory VM detection."""
+class TestHighMemoryRiskDetection:
+    """Test high memory VM risk detection individually."""
 
     def test_detect_high_memory_vms_finds_high_memory_vms(self, comprehensive_excel_data):
         """Test that high memory VMs are detected."""
@@ -327,8 +402,8 @@ class TestHighMemoryVMs:
             assert vm in vm_names, f"Should detect {vm} as high memory VM"
 
 
-class TestHWVersionCompatibility:
-    """Test hardware version compatibility detection."""
+class TestHWVersionCompatibilityRiskDetection:
+    """Test hardware version compatibility risk detection individually."""
 
     def test_detect_hw_version_compatibility_finds_old_hw(self, comprehensive_excel_data):
         """Test that old hardware versions are detected."""
@@ -351,95 +426,3 @@ class TestHWVersionCompatibility:
         for issue in hw_issues:
             assert 'Unsupported migration methods' in issue
             assert len(issue['Unsupported migration methods']) > 0
-
-
-class TestGatherAllRisks:
-    """Test the main risk gathering function."""
-
-    def test_gather_all_risks_finds_all_15_risks(self, comprehensive_excel_data):
-        """Test that all 15 risk types are detected."""
-        result = gather_all_risks(comprehensive_excel_data)
-
-        assert 'summary' in result
-        assert 'risks' in result
-
-        # Should have results for all 15 risk functions
-        risks = result['risks']
-        assert len(risks) == 15, f"Should have 15 risk types, found {len(risks)}"
-
-        # Check that each risk type has proper structure
-        expected_risk_functions = [
-            'detect_esx_versions', 'detect_vusb_devices', 'detect_risky_disks',
-            'detect_non_dvs_switches', 'detect_snapshots', 'detect_suspended_vms',
-            'detect_oracle_vms', 'detect_dvport_issues', 'detect_non_intel_hosts',
-            'detect_vmtools_not_running', 'detect_cdrom_issues', 'detect_large_provisioned_vms',
-            'detect_high_vcpu_vms', 'detect_high_memory_vms', 'detect_hw_version_compatibility'
-        ]
-
-        for func_name in expected_risk_functions:
-            assert func_name in risks, f"Should have results for {func_name}"
-            risk_result = risks[func_name]
-            assert 'count' in risk_result
-            assert 'data' in risk_result
-            assert risk_result['count'] > 0, f"{func_name} should detect at least one risk"
-
-    def test_gather_all_risks_summary_structure(self, comprehensive_excel_data):
-        """Test the summary structure of gather_all_risks."""
-        result = gather_all_risks(comprehensive_excel_data)
-
-        summary = result['summary']
-        assert 'total_risks' in summary
-        assert 'risk_levels' in summary
-
-        risk_levels = summary['risk_levels']
-        assert 'info' in risk_levels
-        assert 'warning' in risk_levels
-        assert 'danger' in risk_levels
-        assert 'blocking' in risk_levels
-
-        # Should have total risks > 0
-        assert summary['total_risks'] > 0, "Should detect multiple risks in test data"
-
-        # Should have blocking risks (old HW versions, suspended VMs, USB devices)
-        assert risk_levels['blocking'] > 0, "Should detect blocking risks"
-
-    def test_gather_all_risks_no_errors(self, comprehensive_excel_data):
-        """Test that no risk detection functions throw errors."""
-        result = gather_all_risks(comprehensive_excel_data)
-
-        risks = result['risks']
-
-        # No risk function should have errors
-        for func_name, risk_result in risks.items():
-            assert 'error' not in risk_result or risk_result.get('error') is None, \
-                f"{func_name} should not have errors: {risk_result.get('error', '')}"
-
-
-class TestPerformanceAndEdgeCases:
-    """Test performance and edge cases."""
-
-    def test_risk_detection_performance(self, comprehensive_excel_data):
-        """Test that risk detection completes in reasonable time."""
-        import time
-
-        start_time = time.time()
-        result = gather_all_risks(comprehensive_excel_data)
-        end_time = time.time()
-
-        execution_time = end_time - start_time
-        assert execution_time < 10.0, f"Risk detection should complete in <10 seconds, took {execution_time:.2f}s"
-
-        # Should still find all risks
-        assert len(result['risks']) == 15
-
-    def test_comprehensive_test_data_coverage(self, comprehensive_excel_data):
-        """Test that our comprehensive test data covers all required sheets."""
-        expected_sheets = [
-            'vHost', 'vInfo', 'vUSB', 'vDisk', 'dvSwitch',
-            'vNetwork', 'vSnapshot', 'dvPort', 'vCD'
-        ]
-
-        available_sheets = comprehensive_excel_data.sheet_names
-
-        for sheet in expected_sheets:
-            assert sheet in available_sheets, f"Test data should include {sheet} sheet"
