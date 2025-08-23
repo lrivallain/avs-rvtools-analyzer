@@ -79,7 +79,7 @@ class RVToolsAnalyzeServer:
         else:
             return obj
 
-    async def run(self, host: str = None, port: int = None):
+    async def run(self, host: str = None, port: int = None, reload: bool = False):
         """Run the HTTP/MCP API server with integrated web UI."""
         # Use config defaults if not provided
         host = host or self.config.server.host
@@ -135,7 +135,9 @@ class RVToolsAnalyzeServer:
             host=host,
             port=port,
             log_level=self.config.server.log_level,
-            timeout_graceful_shutdown=self.config.server.timeout_graceful_shutdown
+            timeout_graceful_shutdown=self.config.server.timeout_graceful_shutdown,
+            reload=reload,
+            reload_dirs=["avs_rvtools_analyzer"] if reload else None
         )
         server = uvicorn.Server(config)
         await server.serve()
@@ -166,11 +168,12 @@ async def server_main():
     parser = argparse.ArgumentParser(description="AVS RVTools Analyzer")
     parser.add_argument("--host", default=default_config.server.host, help=f"Host to bind to (default: {default_config.server.host})")
     parser.add_argument("--port", type=int, default=default_config.server.port, help=f"Port to bind to (default: {default_config.server.port})")
+    parser.add_argument("--reload", action="store_true", help="Enable auto-reload for development")
 
     args = parser.parse_args()
 
     server = RVToolsAnalyzeServer()
-    await server.run(host=args.host, port=args.port)
+    await server.run(host=args.host, port=args.port, reload=args.reload)
 
 
 def main():
