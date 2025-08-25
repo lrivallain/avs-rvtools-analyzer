@@ -84,43 +84,43 @@ def allowed_file(filename, allowed_extensions=None):
 def contains_password_reference(text):
     """
     Check if text contains password-related terms.
-    
+
     Args:
         text: String to check for password references
-        
+
     Returns:
         bool: True if password-related terms are found, False otherwise
     """
     if not text or pd.isna(text):
         return False
-    
+
     # Password patterns to search for (case-insensitive)
     password_patterns = [
         r'\bpassword\b', r'\bpwd\b', r'\bpass\b', r'\bpasswd\b',
         r'\bpassphrase\b', r'\bpasskey\b', r'\bsecret\b', r'\bcredential\b'
     ]
-    
+
     # Combine all patterns into a single regex
     combined_pattern = '|'.join(password_patterns)
     password_regex = re.compile(combined_pattern, re.IGNORECASE)
-    
+
     return bool(password_regex.search(str(text)))
 
 
 def redact_password_content(text):
     """
     Redact password-containing text for security purposes.
-    
+
     Args:
         text: Original text that may contain passwords
-        
+
     Returns:
         str: Redacted message indicating content was hidden for security
     """
     if not text or pd.isna(text):
         return text
-    
+
     if contains_password_reference(text):
-        return "[CONTENT REDACTED - Password reference detected for security]"
-    
+        return "[CONTENT REDACTED - Password reference redacted for security]"
+
     return text

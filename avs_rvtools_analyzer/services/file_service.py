@@ -106,7 +106,7 @@ class FileService:
     async def load_excel_file_from_memory(self, file: UploadFile) -> Dict[str, Any]:
         """
         Load Excel file directly from memory without saving to disk.
-        
+
         This method provides true in-memory processing for enhanced security,
         ensuring that sensitive data never touches the file system.
 
@@ -164,7 +164,7 @@ class FileService:
             except BadZipFile:
                 # Reset stream position for xlrd attempt
                 file_stream.seek(0)
-                
+
                 # Try with xlrd for .xls files
                 try:
                     workbook = xlrd.open_workbook(file_contents=file_stream.read())

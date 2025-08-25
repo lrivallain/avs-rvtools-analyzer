@@ -105,26 +105,26 @@ class TestRiskyDiskRiskDetection:
 
         assert len(raw_disks) > 0, "Should find raw device mapping disks"
         assert len(independent_disks) > 0, "Should find independent mode disks"
-        
+
         # Test dynamic risk levels based on Raw Com. Mode
         physical_mode_disks = [disk for disk in risky_disks if disk.get('Raw Com. Mode') == 'physicalMode']
         virtual_mode_disks = [disk for disk in risky_disks if disk.get('Raw Com. Mode') == 'virtualMode']
-        
+
         assert len(physical_mode_disks) > 0, "Should find physicalMode RDM disks"
         assert len(virtual_mode_disks) > 0, "Should find virtualMode RDM disks"
-        
+
         # Verify risk levels are correctly assigned
         for disk in physical_mode_disks:
             assert disk.get('Risk Level') == 'blocking', f"PhysicalMode RDM should be blocking risk: {disk}"
-            
+
         for disk in virtual_mode_disks:
             assert disk.get('Risk Level') == 'warning', f"VirtualMode RDM should be warning risk: {disk}"
-            
+
         # Verify that all risky disks have a Risk Level column
         for disk in risky_disks:
             assert 'Risk Level' in disk, "All risky disks should have Risk Level column"
             assert disk['Risk Level'] in ['blocking', 'warning'], f"Risk Level should be blocking or warning: {disk['Risk Level']}"
-        
+
         # Verify details section
         assert 'details' in result, "Should include details section"
         assert 'blocking_risks' in result['details'], "Should include blocking risks count"
@@ -555,7 +555,7 @@ class TestDetectClearTextPasswords:
         """Test detection of passwords in VM annotations."""
         class MockExcelData:
             sheet_names = ['vInfo', 'vSnapshot']
-            
+
             def parse(self, sheet_name):
                 if sheet_name == 'vInfo':
                     return pd.DataFrame({
@@ -575,14 +575,14 @@ class TestDetectClearTextPasswords:
 
         assert result['count'] == 2, f"Should detect 2 VMs with password references, got {result['count']}"
         assert len(result['data']) == 2, f"Should return data for 2 VMs, got {len(result['data'])}"
-        
+
         # Check first detection
         first_detection = result['data'][0]
         assert first_detection['Source'] == 'VM Annotation'
         assert first_detection['VM Name'] == 'VM1'
         assert first_detection['Location Type'] == 'vInfo Sheet'
         assert first_detection['Risk Level'] == 'emergency'
-        
+
         # Check second detection
         second_detection = result['data'][1]
         assert second_detection['VM Name'] == 'VM3'
@@ -592,7 +592,7 @@ class TestDetectClearTextPasswords:
         """Test detection of passwords in snapshot descriptions."""
         class MockExcelData:
             sheet_names = ['vInfo', 'vSnapshot']
-            
+
             def parse(self, sheet_name):
                 if sheet_name == 'vSnapshot':
                     return pd.DataFrame({
@@ -621,7 +621,7 @@ class TestDetectClearTextPasswords:
         """Test detection of various password-related terms."""
         class MockExcelData:
             sheet_names = ['vInfo', 'vSnapshot']
-            
+
             def parse(self, sheet_name):
                 if sheet_name == 'vInfo':
                     return pd.DataFrame({
@@ -645,7 +645,7 @@ class TestDetectClearTextPasswords:
         """Test when no passwords are found."""
         class MockExcelData:
             sheet_names = ['vInfo', 'vSnapshot']
-            
+
             def parse(self, sheet_name):
                 if sheet_name == 'vInfo':
                     return pd.DataFrame({
@@ -673,7 +673,7 @@ class TestDetectClearTextPasswords:
         """Test behavior when sheets are missing."""
         class MockExcelData:
             sheet_names = []
-            
+
             def parse(self, sheet_name):
                 return pd.DataFrame()  # Return empty for all sheets
 
@@ -687,7 +687,7 @@ class TestDetectClearTextPasswords:
         """Test that password detection is case-insensitive."""
         class MockExcelData:
             sheet_names = ['vInfo', 'vSnapshot']
-            
+
             def parse(self, sheet_name):
                 if sheet_name == 'vInfo':
                     return pd.DataFrame({

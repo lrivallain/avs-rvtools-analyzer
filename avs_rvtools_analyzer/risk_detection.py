@@ -231,7 +231,7 @@ def detect_snapshots(excel_data: pd.ExcelFile) -> Dict[str, Any]:
         return {'count': 0, 'data': []}
 
     vsnapshot_sheet = excel_data.parse('vSnapshot')
-    
+
     # Process snapshots and redact any descriptions containing passwords
     snapshots = []
     for _, row in vsnapshot_sheet.iterrows():

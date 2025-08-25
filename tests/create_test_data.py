@@ -63,7 +63,7 @@ VMS = [
     # Standard VMs (good)
     {"name": "vm-web-server-01", "type": "web"},
     {"name": "vm-web-server-02", "type": "web", "memory": 16384, "provisioned": 204800},
-    
+
     # Password exposure VMs (critical security risk)
     {"name": "vm-password-exposed-01", "type": "web", "annotation": "Admin user password is admin123 - change after deployment"},
     {"name": "vm-password-exposed-02", "type": "web", "annotation": "Service account pwd: ServicePass456"},
