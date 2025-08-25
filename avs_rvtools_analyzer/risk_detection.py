@@ -474,7 +474,7 @@ def detect_high_vcpu_vms(excel_data: pd.ExcelFile) -> Dict[str, Any]:
             vm_data_entry = {
                 'VM': vm['VM'],
                 'vCPU Count': vm['CPUs'],
-                **{sku: '✘' if vm['CPUs'] > cores else '✓' for sku, cores in sku_cores.items()}
+                **{sku: False if vm['CPUs'] > cores else True for sku, cores in sku_cores.items()}
             }
             high_vcpu_vms.append(vm_data_entry)
 
@@ -517,7 +517,7 @@ def detect_high_memory_vms(excel_data: pd.ExcelFile) -> Dict[str, Any]:
                 'VM': vm['VM'],
                 'Memory (GB)': round(vm['Memory'] / 1024, 2),
                 **{
-                    sku['name']: '✘' if vm['Memory'] > sku['ram'] * 1024 else '✓'
+                    sku['name']: False if vm['Memory'] > sku['ram'] * 1024 else True
                     for sku in sku_data
                 }
             }
