@@ -94,11 +94,16 @@ def detect_vusb_devices(excel_data: pd.ExcelFile) -> Dict[str, Any]:
 
 
 @risk_info(
-    level='blocking',
+    level='warning',  # Changed to warning as base level since we now have dynamic risk levels
     description='Risky disks are virtual disks that are configured in a way that may pose a risk during migration.',
     alert_message="""This can include disks that are set to "Independent" mode or configured with Raw Device
-    Mapping capability.<br><br>It's recommended to review the list of risky disks and consider reconfiguring
-    them before proceeding with the migration."""
+    Mapping capability:<br>
+    <ul>
+        <li>Raw Device Mapping in physicalMode: Blocking risk — cannot be migrated</li>
+        <li>Raw Device Mapping in virtualMode: Warning — bulk migration possible with disk conversion</li>
+        <li>Independent persistent mode: Warning — requires special consideration</li>
+    </ul>
+    It's recommended to review the list of risky disks and consider reconfiguring them before proceeding with the migration."""
 )
 def detect_risky_disks(excel_data: pd.ExcelFile) -> Dict[str, Any]:
     """Detect disks with migration risks (raw or independent persistent)."""
@@ -115,15 +120,51 @@ def detect_risky_disks(excel_data: pd.ExcelFile) -> Dict[str, Any]:
     )
 
     # Select only columns that exist in the data
-    columns_to_return = ['VM', 'Powerstate', 'Disk', 'Capacity MiB', 'Raw', 'Disk Mode']
+    columns_to_return = ['VM', 'Powerstate', 'Disk', 'Capacity MiB', 'Raw', 'Disk Mode', 'Raw Com. Mode']
     available_columns = [col for col in columns_to_return if col in vdisk_data.columns]
 
-    risky_disks = vdisk_data[mask][available_columns].to_dict(orient='records')
+    risky_disks_df = vdisk_data[mask][available_columns].copy()
+
+    # Add dynamic risk level based on Raw Com. Mode
+    def determine_risk_level(row):
+        # Handle Raw column - convert to string for comparison
+        raw_value = str(row.get('Raw', '')).lower()
+        if raw_value == 'true':
+            raw_com_mode = str(row.get('Raw Com. Mode', '')).lower()
+            if raw_com_mode == 'physicalmode':
+                return 'blocking'
+            elif raw_com_mode == 'virtualmode':
+                return 'warning'
+            else:
+                return 'warning'  # Default for raw disks without specified mode
+        elif row.get('Disk Mode') == 'independent_persistent':
+            return 'warning'
+        else:
+            return 'warning'  # Default fallback
+
+    risky_disks_df['Risk Level'] = risky_disks_df.apply(determine_risk_level, axis=1)
+
+    risky_disks = risky_disks_df.to_dict(orient='records')
+
+    # Count blocking vs warning risks
+    blocking_count = len([disk for disk in risky_disks if disk.get('Risk Level') == 'blocking'])
+    warning_count = len([disk for disk in risky_disks if disk.get('Risk Level') == 'warning'])
+
+    # Determine overall card risk level based on highest severity found
+    card_risk = "warning"  # Default since base level is warning
+    if blocking_count > 0:
+        card_risk = "blocking"
 
     logger.info(f"detect_risky_disks: Found {len(risky_disks)} risky disks (raw or independent persistent)")
     return {
         'count': len(risky_disks),
-        'data': risky_disks
+        'data': risky_disks,
+        'details': {
+            'blocking_risks': blocking_count,
+            'warning_risks': warning_count,
+            'has_physical_mode_rdm': blocking_count > 0,
+            'card_risk': card_risk
+        }
     }
 
 
@@ -674,7 +715,7 @@ def detect_shared_disks(excel_data: pd.ExcelFile) -> Dict[str, Any]:
 def get_risk_functions_list() -> List:
     """
     Get the centralized list of all risk detection functions.
-    
+
     Returns:
         List of risk detection functions
     """
@@ -700,7 +741,7 @@ def get_risk_functions_list() -> List:
 def get_total_risk_functions_count() -> int:
     """
     Get the total number of available risk detection functions.
-    
+
     Returns:
         Integer count of risk detection functions
     """

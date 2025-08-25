@@ -104,6 +104,31 @@ class TestRiskyDiskRiskDetection:
 
         assert len(raw_disks) > 0, "Should find raw device mapping disks"
         assert len(independent_disks) > 0, "Should find independent mode disks"
+        
+        # Test dynamic risk levels based on Raw Com. Mode
+        physical_mode_disks = [disk for disk in risky_disks if disk.get('Raw Com. Mode') == 'physicalMode']
+        virtual_mode_disks = [disk for disk in risky_disks if disk.get('Raw Com. Mode') == 'virtualMode']
+        
+        assert len(physical_mode_disks) > 0, "Should find physicalMode RDM disks"
+        assert len(virtual_mode_disks) > 0, "Should find virtualMode RDM disks"
+        
+        # Verify risk levels are correctly assigned
+        for disk in physical_mode_disks:
+            assert disk.get('Risk Level') == 'blocking', f"PhysicalMode RDM should be blocking risk: {disk}"
+            
+        for disk in virtual_mode_disks:
+            assert disk.get('Risk Level') == 'warning', f"VirtualMode RDM should be warning risk: {disk}"
+            
+        # Verify that all risky disks have a Risk Level column
+        for disk in risky_disks:
+            assert 'Risk Level' in disk, "All risky disks should have Risk Level column"
+            assert disk['Risk Level'] in ['blocking', 'warning'], f"Risk Level should be blocking or warning: {disk['Risk Level']}"
+        
+        # Verify details section
+        assert 'details' in result, "Should include details section"
+        assert 'blocking_risks' in result['details'], "Should include blocking risks count"
+        assert 'warning_risks' in result['details'], "Should include warning risks count"
+        assert 'has_physical_mode_rdm' in result['details'], "Should include physical mode RDM indicator"
 
 
 class TestNetworkSwitchRiskDetection:

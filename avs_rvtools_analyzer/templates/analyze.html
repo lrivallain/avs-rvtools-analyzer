@@ -100,7 +100,11 @@
                                     <tr>
                                         {% for key, value in item.items() %}
                                             <td class="wrap">
-                                                {% if value is sameas true %}
+                                                {% if key == 'Risk Level' %}
+                                                <span class="badge rounded-pill {{ get_risk_badge_class(value) }}">
+                                                    {{ get_risk_display_name(value) }}
+                                                </span>
+                                                {% elif value is sameas true %}
                                                     <span class="text-success"><strong>✓</strong></span>
                                                 {% elif value is sameas false %}
                                                     <span class="text-danger">✘</span>
