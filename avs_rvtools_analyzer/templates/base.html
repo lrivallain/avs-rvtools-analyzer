@@ -41,6 +41,9 @@
         }
 
         @media print {
+            body {
+                font-size: 12px; /* Slightly reduced base font size for print */
+            }
             .container {
                 width: 100%;
                 margin: 25px;
@@ -48,20 +51,80 @@
             }
             .card {
                 page-break-inside: avoid;
+                margin-bottom: 12px !important; /* Reduce card spacing */
+            }
+            .card-body {
+                padding: 12px !important; /* Reduce card padding */
+            }
+            .card-header, .card-footer {
+                padding: 8px 12px !important; /* Reduce header/footer padding */
             }
             .d-flex {
                 flex-wrap: wrap;
                 justify-content: space-between;
             }
-            .btn, .navbar {
-                display: none; /* Hide buttons during print */
+            .btn, .navbar, footer {
+                display: none; /* Hide buttons, navbar, and footer during print */
             }
             .badge, .card-header, .card-footer {
                 -webkit-print-color-adjust: exact; /* Ensure colors are printed */
                 print-color-adjust: exact; /* Standard property for compatibility */
             }
-            h1, .lead {
-                color:#121212;
+            h1 {
+                font-size: 24px !important; /* Main heading */
+                margin-bottom: 12px !important;
+                color: #121212;
+            }
+            h2 {
+                font-size: 18px !important; /* Section headings */
+                margin-bottom: 10px !important;
+            }
+            h5.card-title {
+                font-size: 14px !important; /* Card titles */
+                margin-bottom: 6px !important;
+            }
+            .lead {
+                font-size: 14px !important; /* Lead text */
+                margin-bottom: 12px !important;
+                color: #121212;
+            }
+            .table {
+                font-size: 10px !important; /* Table text */
+                margin-bottom: 10px !important;
+            }
+            .table th, .table td {
+                padding: 3px 6px !important; /* Table cell padding */
+                line-height: 1.3 !important;
+            }
+            .badge {
+                font-size: 9px !important; /* Badges */
+                padding: 3px 6px !important;
+            }
+            .alert {
+                font-size: 11px !important; /* Alert text */
+                padding: 8px !important;
+                margin-bottom: 10px !important;
+            }
+            .card p {
+                font-size: 11px !important; /* Paragraph text */
+                margin-bottom: 8px !important;
+            }
+            /* Summary cards specific styling for print */
+            #summary-cards .card {
+                width: 140px !important; /* Summary cards */
+                margin: 4px !important;
+                font-size: 10px !important;
+            }
+            #summary-cards .card-body {
+                padding: 6px !important;
+            }
+            #summary-cards .card-title {
+                font-size: 11px !important;
+                margin-bottom: 3px !important;
+            }
+            #summary-cards .card-text {
+                font-size: 10px !important;
+                margin-bottom: 3px !important;
             }
         }
     </style>
