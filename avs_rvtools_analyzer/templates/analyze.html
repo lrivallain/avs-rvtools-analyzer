@@ -10,7 +10,7 @@
 {% if risk_results and risk_results.risks %}
 <!-- Summary Cards Section -->
 <div class="d-flex flex-wrap justify-content-start" id="summary-cards">
-    {% set risk_order = ['blocking', 'danger', 'warning', 'info'] %}
+    {% set risk_order = ['emergency', 'blocking', 'danger', 'warning', 'info'] %}
     {% for risk_level in risk_order %}
         {% for risk_name, risk_data in risk_results.risks.items() %}
             {% if risk_data.count > 0 and risk_data.risk_level == risk_level %}
@@ -34,6 +34,7 @@
 <div class="d-flex justify-content-end mb-3">
     <div class="btn-group" role="group" aria-label="Filter Severity">
         <button type="button" class="btn btn-outline-primary" onclick="filterCards('all')">All</button>
+        <button type="button" class="btn btn-outline-dark filter-outline-dark" onclick="filterCards('emergency')">Emergency</button>
         <button type="button" class="btn btn-outline-danger" onclick="filterCards('blocking')">Blocking</button>
         <button type="button" class="btn btn-outline-warning" onclick="filterCards('warning')">Warning</button>
         <button type="button" class="btn btn-outline-info" onclick="filterCards('info')">Info</button>
@@ -41,7 +42,7 @@
 </div>
 
 <!-- Risk Detail Cards -->
-{% set risk_order = ['blocking', 'danger', 'warning', 'info'] %}
+{% set risk_order = ['emergency', 'blocking', 'danger', 'warning', 'info'] %}
 {% for risk_level in risk_order %}
     {% for risk_name, risk_data in risk_results.risks.items() %}
         {% if risk_data.count > 0 and risk_data.risk_level == risk_level %}
@@ -220,7 +221,8 @@
         cards.forEach(card => {
             const riskLevel = card.getAttribute('data-risk-level');
             if (severity === 'all' || riskLevel === severity ||
-                (severity === 'blocking' && (riskLevel === 'danger' || riskLevel === 'blocking'))) {
+                (severity === 'blocking' && (riskLevel === 'danger' || riskLevel === 'blocking')) ||
+                (severity === 'emergency' && riskLevel === 'emergency')) {
                 card.style.display = '';
             } else {
                 card.style.display = 'none';
@@ -231,7 +233,8 @@
             const badge = card.querySelector('.badge');
             const badgeText = badge ? badge.textContent.toLowerCase() : '';
             if (severity === 'all' || badgeText.includes(severity) ||
-                (severity === 'blocking' && badgeText.includes('blocking'))) {
+                (severity === 'blocking' && badgeText.includes('blocking')) ||
+                (severity === 'emergency' && badgeText.includes('emergency'))) {
                 card.style.display = '';
             } else {
                 card.style.display = 'none';
@@ -293,7 +296,73 @@
     // Initialize resizable tables when DOM is loaded
     document.addEventListener('DOMContentLoaded', function() {
         makeTablesResizable();
+
+        // Check for emergency risks and show warning popup
+        checkForEmergencyRisks();
     });
+
+    function checkForEmergencyRisks() {
+        const emergencyCards = document.querySelectorAll('.card[data-risk-level="emergency"]');
+        if (emergencyCards.length > 0) {
+            // Create and show emergency warning modal
+            showEmergencyWarning();
+        }
+    }
+
+    function showEmergencyWarning() {
+        // Create modal HTML
+        const modalHTML = `
+            <div class="modal fade" id="emergencyWarningModal" tabindex="-1" aria-labelledby="emergencyWarningModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content border-danger">
+                        <div class="modal-header bg-danger text-white">
+                            <h5 class="modal-title" id="emergencyWarningModalLabel">
+                                <i class="fas fa-exclamation-triangle"></i> CRITICAL SECURITY ALERT
+                            </h5>
+                        </div>
+                        <div class="modal-body">
+                            <div class="alert alert-danger" role="alert">
+                                <h4 class="alert-heading"><i class="fas fa-shield-alt"></i> Password Exposure Detected!</h4>
+                                <p><strong>Clear text passwords have been found in your VMware environment.</strong></p>
+                                <hr>
+                                <p class="mb-0">
+                                    <strong>IMMEDIATE ACTION REQUIRED:</strong>
+                                    <ul class="mt-2">
+                                        <li>Review the detected items below</li>
+                                        <li>Remove all clear text passwords from VM annotations and snapshot descriptions</li>
+                                        <li>Rotate any exposed passwords immediately</li>
+                                        <li>Implement secure password management practices</li>
+                                    </ul>
+                                </p>
+                            </div>
+                            <div class="alert alert-info" role="alert">
+                                <strong><i class="fas fa-info-circle"></i> Privacy Notice:</strong>
+                                This RVTools file was analyzed in memory only and has NOT been stored on our server.
+                                However, the security risk remains in your VMware environment and in the file that was submitted.
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-danger" data-bs-dismiss="modal">
+                                <i class="fas fa-check"></i> I Understand - Show Analysis
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Add modal to page
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('emergencyWarningModal'));
+        modal.show();
+
+        // Clean up modal after it's hidden
+        document.getElementById('emergencyWarningModal').addEventListener('hidden.bs.modal', function () {
+            this.remove();
+        });
+    }
 </script>
 
 {% endblock %}

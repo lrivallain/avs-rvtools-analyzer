@@ -48,28 +48,20 @@ def setup_web_routes(
             # Validate file
             file_service.validate_file(file)
 
-            # Save uploaded file
-            temp_file_path = await file_service.save_uploaded_file(file)
+            # Load Excel file directly from memory (no temp file)
+            excel_data = await file_service.load_excel_file_from_memory(file)
 
-            try:
-                # Load Excel file
-                excel_data = file_service.load_excel_file(temp_file_path)
+            # Extract sheets data
+            sheets = file_service.get_excel_sheets_data(excel_data)
 
-                # Extract sheets data
-                sheets = file_service.get_excel_sheets_data(excel_data)
-
-                return templates.TemplateResponse(
-                    request=request,
-                    name="explore.html",
-                    context={
-                        "sheets": sheets,
-                        "filename": file.filename
-                    }
-                )
-
-            finally:
-                # Clean up temp file
-                file_service.cleanup_temp_file(temp_file_path)
+            return templates.TemplateResponse(
+                request=request,
+                name="explore.html",
+                context={
+                    "sheets": sheets,
+                    "filename": file.filename
+                }
+            )
 
         except Exception as e:
             return templates.TemplateResponse(
@@ -85,35 +77,27 @@ def setup_web_routes(
             # Validate file
             file_service.validate_file(file)
 
-            # Save uploaded file
-            temp_file_path = await file_service.save_uploaded_file(file)
+            # Load Excel file directly from memory (no temp file)
+            excel_data = await file_service.load_excel_file_from_memory(file)
 
-            try:
-                # Load Excel file
-                excel_data = file_service.load_excel_file(temp_file_path)
+            # Validate Excel data for analysis
+            analysis_service.validate_excel_data(excel_data)
 
-                # Validate Excel data for analysis
-                analysis_service.validate_excel_data(excel_data)
+            # Perform risk analysis
+            risk_results = analysis_service.analyze_risks(
+                excel_data,
+                include_details=True,
+                filter_zero_counts=True
+            )
 
-                # Perform risk analysis
-                risk_results = analysis_service.analyze_risks(
-                    excel_data,
-                    include_details=True,
-                    filter_zero_counts=True
-                )
-
-                return templates.TemplateResponse(
-                    request=request,
-                    name="analyze.html",
-                    context={
-                        "filename": file.filename,
-                        "risk_results": risk_results,
-                    }
-                )
-
-            finally:
-                # Clean up temp file
-                file_service.cleanup_temp_file(temp_file_path)
+            return templates.TemplateResponse(
+                request=request,
+                name="analyze.html",
+                context={
+                    "filename": file.filename,
+                    "risk_results": risk_results,
+                }
+            )
 
         except Exception as e:
             return templates.TemplateResponse(
@@ -129,49 +113,41 @@ def setup_web_routes(
             # Validate file
             file_service.validate_file(file)
 
-            # Save uploaded file
-            temp_file_path = await file_service.save_uploaded_file(file)
+            # Load Excel file directly from memory (no temp file)
+            excel_data = await file_service.load_excel_file_from_memory(file)
 
-            try:
-                # Load Excel file
-                excel_data = file_service.load_excel_file(temp_file_path)
+            # Convert to JSON format - simplified output just like the API
+            json_result = {}
+            for sheet_name, sheet_info in excel_data.items():
+                # Get the data from the sheet
+                sheet_data = sheet_info.get('data', [])
 
-                # Convert to JSON format - simplified output just like the API
-                json_result = {}
-                for sheet_name, sheet_info in excel_data.items():
-                    # Get the data from the sheet
-                    sheet_data = sheet_info.get('data', [])
+                # Remove rows where all values are None/empty
+                filtered_data = []
+                for row in sheet_data:
+                    if any(value is not None and str(value).strip() != '' for value in row.values()):
+                        # Clean each value for JSON serialization
+                        cleaned_row = {k: clean_value_for_json(v) for k, v in row.items()}
+                        filtered_data.append(cleaned_row)
 
-                    # Remove rows where all values are None/empty
-                    filtered_data = []
-                    for row in sheet_data:
-                        if any(value is not None and str(value).strip() != '' for value in row.values()):
-                            # Clean each value for JSON serialization
-                            cleaned_row = {k: clean_value_for_json(v) for k, v in row.items()}
-                            filtered_data.append(cleaned_row)
+                # Store only the data for this sheet
+                json_result[sheet_name] = filtered_data
 
-                    # Store only the data for this sheet
-                    json_result[sheet_name] = filtered_data
+            # Convert to JSON string with nice formatting
+            json_content = json.dumps(json_result, indent=2, ensure_ascii=False, default=json_serializer)
 
-                # Convert to JSON string with nice formatting
-                json_content = json.dumps(json_result, indent=2, ensure_ascii=False, default=json_serializer)
+            # Create filename based on original file
+            original_name = file.filename.rsplit('.', 1)[0] if file.filename else 'rvtools_export'
+            json_filename = f"{original_name}.json"
 
-                # Create filename based on original file
-                original_name = file.filename.rsplit('.', 1)[0] if file.filename else 'rvtools_export'
-                json_filename = f"{original_name}.json"
-
-                # Return as downloadable JSON file
-                return Response(
-                    content=json_content,
-                    media_type="application/json",
-                    headers={
-                        "Content-Disposition": f"attachment; filename={json_filename}"
-                    }
-                )
-
-            finally:
-                # Clean up temp file
-                file_service.cleanup_temp_file(temp_file_path)
+            # Return as downloadable JSON file
+            return Response(
+                content=json_content,
+                media_type="application/json",
+                headers={
+                    "Content-Disposition": f"attachment; filename={json_filename}"
+                }
+            )
 
         except Exception as e:
             return templates.TemplateResponse(

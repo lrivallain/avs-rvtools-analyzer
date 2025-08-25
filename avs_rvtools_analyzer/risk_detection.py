@@ -14,6 +14,7 @@ from .helpers import (
     filter_dataframe_by_condition, get_risk_category, convert_mib_to_tb,
     clean_function_name_for_display
 )
+from .utils import contains_password_reference, redact_password_content
 from .decorators import risk_info
 
 import logging
@@ -224,15 +225,25 @@ def detect_non_dvs_switches(excel_data: pd.ExcelFile) -> Dict[str, Any]:
     consolidating or deleting unnecessary snapshots."""
 )
 def detect_snapshots(excel_data: pd.ExcelFile) -> Dict[str, Any]:
-    """Detect VM snapshots."""
+    """Detect VM snapshots with password redaction for security."""
     if 'vSnapshot' not in excel_data.sheet_names:
         logger.warning("detect_snapshots: No vSnapshot sheet found")
         return {'count': 0, 'data': []}
 
     vsnapshot_sheet = excel_data.parse('vSnapshot')
-    snapshots = vsnapshot_sheet[
-        ['VM', 'Powerstate', 'Name', 'Date / time', 'Size MiB (vmsn)', 'Description']
-    ].to_dict(orient='records')
+    
+    # Process snapshots and redact any descriptions containing passwords
+    snapshots = []
+    for _, row in vsnapshot_sheet.iterrows():
+        snapshot_data = {
+            'VM': row.get('VM', ''),
+            'Powerstate': row.get('Powerstate', ''),
+            'Name': row.get('Name', ''),
+            'Date / time': row.get('Date / time', ''),
+            'Size MiB (vmsn)': row.get('Size MiB (vmsn)', ''),
+            'Description': redact_password_content(row.get('Description', ''))
+        }
+        snapshots.append(snapshot_data)
 
     logger.info(f"detect_snapshots: Found {len(snapshots)} VM snapshots")
     return {
@@ -706,11 +717,84 @@ def detect_shared_disks(excel_data: pd.ExcelFile) -> Dict[str, Any]:
     }
 
 
+@risk_info(
+    level=RiskLevel.EMERGENCY,
+    description='Critical security risk: Clear text passwords detected in VM annotations or snapshot descriptions.',
+    alert_message="""<strong>CRITICAL SECURITY ALERT:</strong> Clear text passwords have been detected in your VMware environment!
+                    This poses a significant security risk. Passwords may have been found in:
+                    <ul>
+                        <li>VM Annotations (vInfo sheet)</li>
+                        <li>Snapshot Descriptions (vSnapshot sheet)</li>
+                    </ul>
+                    <strong>IMPORTANT:</strong> This RVTools file has NOT been stored on our server and was analyzed in memory only.
+                    However, you should immediately:
+                    <ul>
+                        <li>Remove all clear text passwords from VM annotations and snapshot descriptions</li>
+                        <li>Rotate any exposed passwords</li>
+                        <li>Implement secure password management practices</li>
+                        <li>Review access to your vCenter environment</li>
+                    </ul>"""
+)
+def detect_clear_text_passwords(excel_data: pd.ExcelFile) -> Dict[str, Any]:
+    """
+    Detect clear text passwords in VM annotations and snapshot descriptions.
+
+    This is a critical security risk detection that scans for any form of "password"
+    in VM annotations (vInfo sheet) and snapshot descriptions (vSnapshot sheet).
+
+    Args:
+        excel_data: Parsed Excel file from RVTools
+
+    Returns:
+        Dictionary with count and data about VMs/snapshots containing passwords
+    """
+    password_exposures = []
+
+    # Check vInfo sheet for passwords in Annotation column
+    vinfo_data = safe_sheet_access(excel_data, 'vInfo')
+    if not vinfo_data.empty and 'Annotation' in vinfo_data.columns:
+        # Filter rows where Annotation contains password-like terms
+        vinfo_with_annotations = vinfo_data[vinfo_data['Annotation'].notna() & (vinfo_data['Annotation'] != '')]
+
+        for _, row in vinfo_with_annotations.iterrows():
+            annotation = str(row['Annotation'])
+            if contains_password_reference(annotation):
+                password_exposures.append({
+                    'Source': 'VM Annotation',
+                    'VM Name': row.get('VM', 'Unknown'),
+                    'Snapshot Name': '',  # N/A for VM annotations
+                    'Location Type': 'vInfo Sheet',
+                    'Risk Level': 'emergency',
+                    'Details': f"Password reference found in VM annotations."
+                })
+
+    # Check vSnapshot sheet for passwords in Description column
+    vsnapshot_data = safe_sheet_access(excel_data, 'vSnapshot')
+    if not vsnapshot_data.empty and 'Description' in vsnapshot_data.columns:
+        # Filter rows where Description contains password-like terms
+        vsnapshot_with_descriptions = vsnapshot_data[vsnapshot_data['Description'].notna() & (vsnapshot_data['Description'] != '')]
+
+        for _, row in vsnapshot_with_descriptions.iterrows():
+            description = str(row['Description'])
+            if contains_password_reference(description):
+                password_exposures.append({
+                    'Source': 'Snapshot Description',
+                    'VM Name': row.get('VM', 'Unknown'),
+                    'Snapshot Name': row.get('Snapshot', 'Unknown'),
+                    'Location Type': 'vSnapshot Sheet',
+                    'Risk Level': 'emergency',
+                    'Details': f"Password reference found in snapshot description."
+                })
+
+    return {'count': len(password_exposures), 'data': password_exposures}
+
+
 ########################################################################################################################
 #                                                                                                                      #
 #                                         End of Risk Detection Functions                                              #
 #                                                                                                                      #
 ########################################################################################################################
+
 
 def get_risk_functions_list() -> List:
     """
@@ -736,6 +820,7 @@ def get_risk_functions_list() -> List:
         detect_high_memory_vms,
         detect_hw_version_compatibility,
         detect_shared_disks,
+        detect_clear_text_passwords,
     ]
 
 def get_total_risk_functions_count() -> int:
@@ -757,7 +842,7 @@ def get_available_risks() -> Dict[str, Any]:
     risk_functions = get_risk_functions_list()
 
     available_risks = {}
-    risk_levels_count = {'info': 0, 'warning': 0, 'danger': 0, 'blocking': 0}
+    risk_levels_count = {'info': 0, 'warning': 0, 'danger': 0, 'blocking': 0, 'emergency': 0}
 
     for func in risk_functions:
         func_name = func.__name__
@@ -799,7 +884,7 @@ def gather_all_risks(excel_data: pd.ExcelFile) -> Dict[str, Any]:
     risk_functions = get_risk_functions_list()
 
     results = {}
-    summary = {'total_risks': 0, 'risk_levels': {'info': 0, 'warning': 0, 'danger': 0, 'blocking': 0}}
+    summary = {'total_risks': 0, 'risk_levels': {'info': 0, 'warning': 0, 'danger': 0, 'blocking': 0, 'emergency': 0}}
 
     for func in risk_functions:
         try:

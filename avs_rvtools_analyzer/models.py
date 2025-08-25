@@ -13,6 +13,7 @@ class RiskLevel(str, Enum):
     WARNING = "warning"
     DANGER = "danger"
     BLOCKING = "blocking"
+    EMERGENCY = "emergency"
 
 
 class RiskInfo(BaseModel):

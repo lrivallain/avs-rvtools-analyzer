@@ -23,6 +23,7 @@ A unified FastAPI application for analyzing RVTools data with both web interface
   - ESX version compatibility (dynamic)
   - VM Hardware version compatibility (blocking)
   - Shared disks (blocking)
+  - Clear text passwords (emergency)
 
 ## AI integration disclaimer
 
