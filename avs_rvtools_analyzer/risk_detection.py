@@ -294,11 +294,11 @@ def detect_oracle_vms(excel_data: pd.ExcelFile) -> Dict[str, Any]:
     description='dvPort issues are related to the configuration of distributed virtual ports in a VMware environment.',
     alert_message="""Multiple dvPort issues can pose a risk during migration:
     <ul>
-        <li>VLAN ID 0 or empty: they cannot be extended via HCX</li>
-        <li>Allow Promiscuous mode enabled</li>
-        <li>Mac Changes enabled</li>
-        <li>Forged Transmits enabled</li>
-        <li>Ephemeral binding: VMs will be migrated with NIC being disconnected</li>
+        <li>VLAN ID 0 or empty — they cannot be extended via HCX.</li>
+        <li>Allow Promiscuous mode enabled — This configuration may require additional setup on destination side.</li>
+        <li>Mac Changes enabled — This configuration may require additional setup on destination side.</li>
+        <li>Forged Transmits enabled — This configuration may require additional setup on destination side.</li>
+        <li>Ephemeral binding — VMs will be migrated with NIC being disconnected.</li>
     </ul>"""
 )
 def detect_dvport_issues(excel_data: pd.ExcelFile) -> Dict[str, Any]:

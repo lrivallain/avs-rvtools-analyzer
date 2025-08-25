@@ -74,6 +74,70 @@ def setup_logging(debug: bool = False):
 # Set up logger with custom formatter
 logger = logging.getLogger(__name__)
 
+# Global app instance for reload functionality
+app = None
+
+def create_app(config: AppConfig = None, debug: bool = False) -> FastAPI:
+    """Create and configure FastAPI application."""
+    config = config or AppConfig()
+
+    # Setup logging for the entire application
+    setup_logging(debug=debug)
+
+    # Use configuration for paths
+    base_dir = config.paths.base_dir
+    templates_dir = config.paths.templates_dir
+    static_dir = config.paths.static_dir
+
+    # Initialize MCP app
+    mcp = FastMCP(config.mcp.name)
+    mcp_app = mcp.http_app(path='/')
+
+    # Create FastAPI app with configuration
+    fastapi_app = FastAPI(
+        title=config.fastapi.title,
+        version=calver_version,
+        description=config.fastapi.description,
+        tags_metadata=config.fastapi.tags_metadata,
+        lifespan=mcp_app.lifespan
+    )
+
+    # Mount MCP app
+    fastapi_app.mount(config.mcp.mount_path, mcp_app)
+
+    # Setup Jinja2 templates
+    templates = Jinja2Templates(directory=str(templates_dir))
+    _setup_jinja_templates(templates)
+
+    # Setup static files if they exist
+    if static_dir.exists():
+        fastapi_app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+    # Add CORS middleware with configuration
+    fastapi_app.add_middleware(
+        CORSMiddleware,
+        allow_origins=config.cors.allow_origins,
+        allow_credentials=config.cors.allow_credentials,
+        allow_methods=config.cors.allow_methods,
+        allow_headers=config.cors.allow_headers,
+    )
+
+    # Setup routes using modules
+    setup_web_routes(fastapi_app, templates, config, config.server.host, config.server.port)
+    setup_api_routes(fastapi_app, mcp, config)
+
+    # Setup error handlers for custom exceptions
+    setup_error_handlers(fastapi_app, templates)
+
+    return fastapi_app
+
+def _setup_jinja_templates(templates: Jinja2Templates) -> None:
+    """Setup Jinja2 template configuration."""
+    templates.env.filters['convert_mib_to_human_readable'] = convert_mib_to_human_readable
+    templates.env.globals['calver_version'] = calver_version
+    templates.env.globals['get_risk_badge_class'] = get_risk_badge_class
+    templates.env.globals['get_risk_display_name'] = get_risk_display_name
+
 
 class RVToolsAnalyzeServer:
     """HTTP/MCP API Server for AVS RVTools analysis capabilities with integrated web UI."""
@@ -82,14 +146,6 @@ class RVToolsAnalyzeServer:
         self.config = config or AppConfig()
         self.debug = debug
         self.temp_files = []  # Track temporary files for cleanup
-
-        # Setup logging for the entire application
-        setup_logging(debug=debug)
-
-        # Use configuration for paths
-        self.base_dir = self.config.paths.base_dir
-        self.templates_dir = self.config.paths.templates_dir
-        self.static_dir = self.config.paths.static_dir
 
     def _clean_nan_values(self, obj):
         """Recursively clean NaN values from nested dictionaries and lists."""
@@ -110,46 +166,6 @@ class RVToolsAnalyzeServer:
         host = host or self.config.server.host
         port = port or self.config.server.port
 
-        # Initialize MCP app
-        mcp = FastMCP(self.config.mcp.name)
-        mcp_app = mcp.http_app(path='/')
-
-        # Create FastAPI app with configuration
-        app = FastAPI(
-            title=self.config.fastapi.title,
-            version=calver_version,
-            description=self.config.fastapi.description,
-            tags_metadata=self.config.fastapi.tags_metadata,
-            lifespan=mcp_app.lifespan
-        )
-
-        # Mount MCP app
-        app.mount(self.config.mcp.mount_path, mcp_app)
-
-        # Setup Jinja2 templates
-        templates = Jinja2Templates(directory=str(self.templates_dir))
-        self._setup_jinja_templates(templates)
-
-        # Setup static files if they exist
-        if self.static_dir.exists():
-            app.mount("/static", StaticFiles(directory=str(self.static_dir)), name="static")
-
-        # Add CORS middleware with configuration
-        app.add_middleware(
-            CORSMiddleware,
-            allow_origins=self.config.cors.allow_origins,
-            allow_credentials=self.config.cors.allow_credentials,
-            allow_methods=self.config.cors.allow_methods,
-            allow_headers=self.config.cors.allow_headers,
-        )
-
-        # Setup routes using modules
-        setup_web_routes(app, templates, self.config, host, port)
-        setup_api_routes(app, mcp, self.config)
-
-        # Setup error handlers for custom exceptions
-        setup_error_handlers(app, templates)
-
         # Log server startup information
         self._log_server_info(host, port)
 
@@ -159,24 +175,29 @@ class RVToolsAnalyzeServer:
         # Set uvicorn log level based on debug flag
         uvicorn_log_level = "debug" if self.debug else self.config.server.log_level
 
-        config = uvicorn.Config(
-            app,
-            host=host,
-            port=port,
-            log_level=uvicorn_log_level,
-            timeout_graceful_shutdown=self.config.server.timeout_graceful_shutdown,
-            reload=reload,
-            reload_dirs=["avs_rvtools_analyzer"] if reload else None
-        )
-        server = uvicorn.Server(config)
-        await server.serve()
-
-    def _setup_jinja_templates(self, templates: Jinja2Templates) -> None:
-        """Setup Jinja2 template configuration."""
-        templates.env.filters['convert_mib_to_human_readable'] = convert_mib_to_human_readable
-        templates.env.globals['calver_version'] = calver_version
-        templates.env.globals['get_risk_badge_class'] = get_risk_badge_class
-        templates.env.globals['get_risk_display_name'] = get_risk_display_name
+        if reload:
+            logger.info(f"🔄 Reload enabled")
+            # Use import string for reload functionality
+            uvicorn.run(
+                "avs_rvtools_analyzer.main:app",
+                host=host,
+                port=port,
+                log_level=uvicorn_log_level,
+                reload=True,
+                factory=True
+            )
+        else:
+            # Create app directly for non-reload mode
+            app = create_app(self.config, self.debug)
+            config = uvicorn.Config(
+                app,
+                host=host,
+                port=port,
+                log_level=uvicorn_log_level,
+                timeout_graceful_shutdown=self.config.server.timeout_graceful_shutdown
+            )
+            server = uvicorn.Server(config)
+            await server.serve()
 
     def _log_server_info(self, host: str, port: int) -> None:
         """Log server startup information."""
@@ -186,6 +207,11 @@ class RVToolsAnalyzeServer:
         logger.info(f"  💊 Health check: http://{host}:{port}/health")
         logger.info(f"  📄 OpenAPI JSON: http://{host}:{port}/openapi.json")
         logger.info(f"  🔗 MCP API: http://{host}:{port}/mcp")
+
+# Create global app instance for reload functionality
+def app():
+    """Factory function to create app for uvicorn reload."""
+    return create_app()
 
 async def server_main():
     """Main entry point for the MCP server."""
