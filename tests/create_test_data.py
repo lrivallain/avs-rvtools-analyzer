@@ -171,18 +171,23 @@ def create_comprehensive_test_data():
             'vm-db-oracle-01', 'vm-db-oracle-02',
             'vm-app-server-01', 'vm-app-server-02',
             'vm-large-storage-01', 'vm-large-storage-02',
-            'vm-risky-disk-01', 'vm-risky-disk-02',     # Risky disk configurations
+            'vm-risky-disk-01', 'vm-risky-disk-02', 'vm-risky-disk-03', 'vm-risky-disk-04',     # Risky disk configurations
             'vm-mixed-issues-01', 'vm-baseline-good'
         ],
-        'Powerstate': ['poweredOn'] * 12,
-        'Disk': ['Hard disk 1'] * 12,
-        'Capacity MiB': [51200, 102400, 102400, 204800, 25600, 51200, 10485760, 20971520, 51200, 102400, 51200, 25600],
-        'Raw': [False, False, False, False, False, False, False, False, True, True, False, False],  # Raw device mapping (risk)
+        'Powerstate': ['poweredOn'] * 14,
+        'Disk': ['Hard disk 1'] * 14,
+        'Capacity MiB': [51200, 102400, 102400, 204800, 25600, 51200, 10485760, 20971520, 51200, 102400, 25600, 51200, 51200, 25600],
+        'Raw': [False, False, False, False, False, False, False, False, True, True, True, True, False, False],  # Raw device mapping (risk)
+        'Raw Com. Mode': [
+            '', '', '', '', '', '', '', '',  # Non-raw disks have empty Raw Com. Mode
+            'physicalMode', 'virtualMode', 'physicalMode', 'virtualMode',  # Raw disks with different compatibility modes
+            '', ''  # Non-raw disks
+        ],
         'Disk Mode': [
             'persistent', 'persistent', 'persistent', 'persistent',
             'persistent', 'persistent', 'persistent', 'persistent',
-            'independent_persistent', 'independent_persistent',  # Independent mode (risk)
-            'independent_nonpersistent', 'persistent'
+            'persistent', 'persistent', 'persistent', 'persistent',  # Raw disks in persistent mode
+            'independent_persistent', 'persistent'  # Independent mode (risk) and normal
         ]
     })
 
@@ -252,7 +257,7 @@ def create_comprehensive_test_data():
         'Port': ['50000001', '50000002', '50000003', '50000004', '50000005', '50000006', '50000007', '50000008', '50000009'],
         'Switch': ['dvSwitch-01'] * 9,
         'Object ID': ['1001', '1002', '1003', '1004', '1005', '1006', '1007', '1008', '1009'],
-        'Type': ['static', 'static', 'ephemeral', 'ephemeral', 'static', 'static', 'ephemeral', 'ephemeral', 'static'],  # Ephemeral types (HCX migration risk)
+        'Type': ['earlyBinding', 'earlyBinding', 'ephemeral', 'ephemeral', 'earlyBinding', 'earlyBinding', 'ephemeral', 'ephemeral', 'earlyBinding'],  # Ephemeral types (HCX migration risk)
         'VLAN': [100, None, 200, None, 300, 400, 500, 600, 700],  # Null VLANs (risk)
         'Allow Promiscuous': ['False', 'True', 'False', 'False', 'False', 'True', 'False', 'False', 'False'],  # Promiscuous mode (risk)
         'Mac Changes': ['False', 'False', 'True', 'False', 'False', 'True', 'False', 'False', 'False'],  # MAC changes (risk)

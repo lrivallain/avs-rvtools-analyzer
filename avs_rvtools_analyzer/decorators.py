@@ -34,11 +34,16 @@ def risk_info(level: Union[RiskLevel, str], description: str, alert_message: str
 
                 # Ensure result follows the expected structure
                 if isinstance(result, dict):
+                    # Check if there's a dynamic card_risk in details that should override the decorator level
+                    effective_risk_level = level.value
+                    if result.get('details') and 'card_risk' in result['details']:
+                        effective_risk_level = result['details']['card_risk']
+
                     # Create a proper RiskResult structure
                     risk_result = {
                         'count': result.get('count', 0),
                         'data': result.get('data', []),
-                        'risk_level': level.value,
+                        'risk_level': effective_risk_level,
                         'function_name': func.__name__,
                         'risk_info': {
                             'description': description,

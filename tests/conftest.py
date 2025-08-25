@@ -21,15 +21,12 @@ def ensure_test_data_exists():
     if not test_data_path.parent.exists():
         test_data_path.parent.mkdir(parents=True)
 
-    # Test data file exists
-    if not test_data_path.exists():
-        # Import and run the test data creation script
-        sys.path.append(str(Path(__file__).parent))
-        from create_test_data import create_comprehensive_test_data
-
-        # Create the test data
-        print(f"Creating test data at {test_data_path}")
-        create_comprehensive_test_data()
+    # Always generate a new test data file
+    sys.path.append(str(Path(__file__).parent))
+    from create_test_data import create_comprehensive_test_data
+    # Create the test data
+    print(f"Creating test data at {test_data_path}")
+    create_comprehensive_test_data()
 
     return test_data_path
 
