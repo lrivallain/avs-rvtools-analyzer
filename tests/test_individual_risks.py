@@ -28,6 +28,7 @@ from avs_rvtools_analyzer.risk_detection import (
     detect_high_memory_vms,
     detect_hw_version_compatibility,
     detect_shared_disks,
+    detect_clear_text_passwords,
 )
 
 
@@ -104,26 +105,26 @@ class TestRiskyDiskRiskDetection:
 
         assert len(raw_disks) > 0, "Should find raw device mapping disks"
         assert len(independent_disks) > 0, "Should find independent mode disks"
-        
+
         # Test dynamic risk levels based on Raw Com. Mode
         physical_mode_disks = [disk for disk in risky_disks if disk.get('Raw Com. Mode') == 'physicalMode']
         virtual_mode_disks = [disk for disk in risky_disks if disk.get('Raw Com. Mode') == 'virtualMode']
-        
+
         assert len(physical_mode_disks) > 0, "Should find physicalMode RDM disks"
         assert len(virtual_mode_disks) > 0, "Should find virtualMode RDM disks"
-        
+
         # Verify risk levels are correctly assigned
         for disk in physical_mode_disks:
             assert disk.get('Risk Level') == 'blocking', f"PhysicalMode RDM should be blocking risk: {disk}"
-            
+
         for disk in virtual_mode_disks:
             assert disk.get('Risk Level') == 'warning', f"VirtualMode RDM should be warning risk: {disk}"
-            
+
         # Verify that all risky disks have a Risk Level column
         for disk in risky_disks:
             assert 'Risk Level' in disk, "All risky disks should have Risk Level column"
             assert disk['Risk Level'] in ['blocking', 'warning'], f"Risk Level should be blocking or warning: {disk['Risk Level']}"
-        
+
         # Verify details section
         assert 'details' in result, "Should include details section"
         assert 'blocking_risks' in result['details'], "Should include blocking risks count"
@@ -545,3 +546,161 @@ class TestSharedDiskRiskDetection:
         assert isinstance(result, dict), "Should return valid result dictionary"
         assert 'count' in result, "Should include count in result"
         assert 'data' in result, "Should include data in result"
+
+
+class TestDetectClearTextPasswords:
+    """Test cases for password detection in VM annotations and snapshots."""
+
+    def test_detect_passwords_in_vinfo_annotations(self):
+        """Test detection of passwords in VM annotations."""
+        class MockExcelData:
+            sheet_names = ['vInfo', 'vSnapshot']
+
+            def parse(self, sheet_name):
+                if sheet_name == 'vInfo':
+                    return pd.DataFrame({
+                        'VM': ['VM1', 'VM2', 'VM3'],
+                        'Annotation': [
+                            'Server password is admin123',
+                            'No secrets here',
+                            'User pwd: secret123'
+                        ]
+                    })
+                elif sheet_name == 'vSnapshot':
+                    return pd.DataFrame()  # Empty snapshot data
+                return pd.DataFrame()
+
+        excel_data = MockExcelData()
+        result = detect_clear_text_passwords(excel_data)
+
+        assert result['count'] == 2, f"Should detect 2 VMs with password references, got {result['count']}"
+        assert len(result['data']) == 2, f"Should return data for 2 VMs, got {len(result['data'])}"
+
+        # Check first detection
+        first_detection = result['data'][0]
+        assert first_detection['Source'] == 'VM Annotation'
+        assert first_detection['VM Name'] == 'VM1'
+        assert first_detection['Location Type'] == 'vInfo Sheet'
+        assert first_detection['Risk Level'] == 'emergency'
+
+        # Check second detection
+        second_detection = result['data'][1]
+        assert second_detection['VM Name'] == 'VM3'
+        assert 'pwd' in first_detection['Details'].lower() or 'password' in first_detection['Details'].lower()
+
+    def test_detect_passwords_in_snapshot_descriptions(self):
+        """Test detection of passwords in snapshot descriptions."""
+        class MockExcelData:
+            sheet_names = ['vInfo', 'vSnapshot']
+
+            def parse(self, sheet_name):
+                if sheet_name == 'vSnapshot':
+                    return pd.DataFrame({
+                        'VM': ['VM1', 'VM2'],
+                        'Snapshot': ['Snap1', 'Snap2'],
+                        'Description': [
+                            'Backup before password change',
+                            'Regular backup'
+                        ]
+                    })
+                elif sheet_name == 'vInfo':
+                    return pd.DataFrame()  # Empty vInfo data
+                return pd.DataFrame()
+
+        excel_data = MockExcelData()
+        result = detect_clear_text_passwords(excel_data)
+
+        assert result['count'] == 1, f"Should detect 1 snapshot with password reference, got {result['count']}"
+        detection = result['data'][0]
+        assert detection['Source'] == 'Snapshot Description'
+        assert detection['VM Name'] == 'VM1'
+        assert detection['Snapshot Name'] == 'Snap1'
+        assert detection['Location Type'] == 'vSnapshot Sheet'
+
+    def test_detect_various_password_terms(self):
+        """Test detection of various password-related terms."""
+        class MockExcelData:
+            sheet_names = ['vInfo', 'vSnapshot']
+
+            def parse(self, sheet_name):
+                if sheet_name == 'vInfo':
+                    return pd.DataFrame({
+                        'VM': ['VM1', 'VM2', 'VM3', 'VM4', 'VM5'],
+                        'Annotation': [
+                            'Contains password term',
+                            'Has pwd reference',
+                            'Secret information here',
+                            'Credential details',
+                            'Clean annotation'
+                        ]
+                    })
+                return pd.DataFrame()
+
+        excel_data = MockExcelData()
+        result = detect_clear_text_passwords(excel_data)
+
+        assert result['count'] == 4, f"Should detect 4 different password-related terms, got {result['count']}"
+
+    def test_no_passwords_detected(self):
+        """Test when no passwords are found."""
+        class MockExcelData:
+            sheet_names = ['vInfo', 'vSnapshot']
+
+            def parse(self, sheet_name):
+                if sheet_name == 'vInfo':
+                    return pd.DataFrame({
+                        'VM': ['VM1', 'VM2'],
+                        'Annotation': [
+                            'Clean server configuration',
+                            'Regular maintenance notes'
+                        ]
+                    })
+                elif sheet_name == 'vSnapshot':
+                    return pd.DataFrame({
+                        'VM': ['VM1'],
+                        'Snapshot': ['Snap1'],
+                        'Description': ['Regular backup snapshot']
+                    })
+                return pd.DataFrame()
+
+        excel_data = MockExcelData()
+        result = detect_clear_text_passwords(excel_data)
+
+        assert result['count'] == 0, f"Should detect no password references, got {result['count']}"
+        assert result['data'] == [], "Should return empty data list"
+
+    def test_missing_sheets(self):
+        """Test behavior when sheets are missing."""
+        class MockExcelData:
+            sheet_names = []
+
+            def parse(self, sheet_name):
+                return pd.DataFrame()  # Return empty for all sheets
+
+        excel_data = MockExcelData()
+        result = detect_clear_text_passwords(excel_data)
+
+        assert result['count'] == 0, "Should handle missing sheets gracefully"
+        assert result['data'] == [], "Should return empty data"
+
+    def test_case_insensitive_detection(self):
+        """Test that password detection is case-insensitive."""
+        class MockExcelData:
+            sheet_names = ['vInfo', 'vSnapshot']
+
+            def parse(self, sheet_name):
+                if sheet_name == 'vInfo':
+                    return pd.DataFrame({
+                        'VM': ['VM1', 'VM2', 'VM3'],
+                        'Annotation': [
+                            'Contains PASSWORD in caps',
+                            'Has Secret in mixed case',
+                            'CREDENTIAL in all caps'
+                        ]
+                    })
+                return pd.DataFrame()
+
+        excel_data = MockExcelData()
+        result = detect_clear_text_passwords(excel_data)
+
+        assert result['count'] == 3, f"Should detect passwords regardless of case, got {result['count']}"

@@ -11,6 +11,7 @@ import xlrd
 import openpyxl
 from zipfile import BadZipFile
 import logging
+import io
 
 from ..config import FileConfig
 from ..core.exceptions import (
@@ -101,6 +102,124 @@ class FileService:
         except Exception as e:
             logger.error(f"Error saving uploaded file: {str(e)}")
             raise TemporaryFileError(f"Error saving file: {str(e)}", operation="save")
+
+    async def load_excel_file_from_memory(self, file: UploadFile) -> Dict[str, Any]:
+        """
+        Load Excel file directly from memory without saving to disk.
+
+        This method provides true in-memory processing for enhanced security,
+        ensuring that sensitive data never touches the file system.
+
+        Args:
+            file: The uploaded file to process
+
+        Returns:
+            Dictionary containing sheet data
+
+        Raises:
+            FileValidationError: If file cannot be loaded or parsed
+            ProtectedFileError: If file is password protected
+        """
+        try:
+            logger.debug(f"Loading Excel file from memory: {file.filename}")
+
+            # Read file content into memory
+            content = await file.read()
+            file_stream = io.BytesIO(content)
+
+            # Try to load with openpyxl first (for .xlsx files)
+            try:
+                workbook = openpyxl.load_workbook(file_stream, read_only=True, data_only=True)
+                sheets = {}
+
+                for sheet_name in workbook.sheetnames:
+                    sheet = workbook[sheet_name]
+                    data = []
+                    headers = []
+
+                    # Get headers from first row
+                    first_row = next(sheet.iter_rows(min_row=1, max_row=1, values_only=True), None)
+                    if first_row:
+                        headers = [str(cell) if cell is not None else f"Column_{i}" for i, cell in enumerate(first_row)]
+
+                    # Get data from remaining rows
+                    for row in sheet.iter_rows(min_row=2, values_only=True):
+                        if any(cell is not None for cell in row):
+                            row_dict = {}
+                            for i, cell in enumerate(row):
+                                if i < len(headers):
+                                    row_dict[headers[i]] = cell
+                            data.append(row_dict)
+
+                    sheets[sheet_name] = {
+                        'headers': headers,
+                        'data': data,
+                        'row_count': len(data)
+                    }
+
+                workbook.close()
+                logger.debug(f"Loaded Excel file from memory with {len(sheets)} sheets")
+                return sheets
+
+            except BadZipFile:
+                # Reset stream position for xlrd attempt
+                file_stream.seek(0)
+
+                # Try with xlrd for .xls files
+                try:
+                    workbook = xlrd.open_workbook(file_contents=file_stream.read())
+                    sheets = {}
+
+                    for sheet_index in range(workbook.nsheets):
+                        sheet = workbook.sheet_by_index(sheet_index)
+                        sheet_name = sheet.name
+
+                        data = []
+                        headers = []
+
+                        if sheet.nrows > 0:
+                            # Get headers from first row
+                            headers = [str(sheet.cell_value(0, col)) for col in range(sheet.ncols)]
+
+                            # Get data from remaining rows
+                            for row in range(1, sheet.nrows):
+                                row_dict = {}
+                                for col in range(sheet.ncols):
+                                    if col < len(headers):
+                                        row_dict[headers[col]] = sheet.cell_value(row, col)
+                                data.append(row_dict)
+
+                        sheets[sheet_name] = {
+                            'headers': headers,
+                            'data': data,
+                            'row_count': len(data)
+                        }
+
+                    logger.debug(f"Loaded Excel file (xls) from memory with {len(sheets)} sheets")
+                    return sheets
+
+                except xlrd.XLRDError as e:
+                    if "password" in str(e).lower() or "encrypted" in str(e).lower():
+                        raise ProtectedFileError("File appears to be password protected")
+                    raise FileValidationError(f"Error reading Excel file: {str(e)}")
+
+        except (ProtectedFileError, FileValidationError):
+            # Re-raise our custom exceptions
+            raise
+        except Exception as e:
+            error_msg = str(e).lower()
+            if "password" in error_msg or "encrypted" in error_msg or "protected" in error_msg:
+                raise ProtectedFileError("File appears to be password protected or encrypted")
+
+            logger.error(f"Error loading Excel file from memory: {str(e)}")
+            raise FileValidationError(f"Error loading Excel file from memory: {str(e)}", file_type="Excel")
+        finally:
+            # Ensure file stream is closed and content is cleared from memory
+            if 'file_stream' in locals():
+                file_stream.close()
+            # Clear the content variable to free memory
+            if 'content' in locals():
+                del content
 
     def load_excel_file(self, file_path: Path) -> Dict[str, Any]:
         """

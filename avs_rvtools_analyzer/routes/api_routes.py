@@ -196,35 +196,27 @@ def setup_api_routes(
         # Validate file
         file_service.validate_file(file)
 
-        # Save uploaded file
-        temp_file_path = await file_service.save_uploaded_file(file)
+        # Load Excel file directly from memory (no temp file)
+        excel_data = await file_service.load_excel_file_from_memory(file)
 
-        try:
-            # Load Excel file
-            excel_data = file_service.load_excel_file(temp_file_path)
+        # Validate Excel data
+        analysis_service.validate_excel_data(excel_data)
 
-            # Validate Excel data
-            analysis_service.validate_excel_data(excel_data)
+        # Perform analysis
+        result = analysis_service.analyze_risks(
+            excel_data,
+            include_details=include_details,
+            filter_zero_counts=True
+        )
 
-            # Perform analysis
-            result = analysis_service.analyze_risks(
-                excel_data,
-                include_details=include_details,
-                filter_zero_counts=True
-            )
-
-            return AnalysisResponse(
-                success=True,
-                message="Analysis completed successfully",
-                risks=result.get("risks", {}),
-                summary=result.get("summary"),
-                total_risks_found=len([r for r in result.get("risks", {}).values() if r.get("count", 0) > 0]),
-                analysis_timestamp=datetime.now(UTC).isoformat() + "Z"
-            )
-
-        finally:
-            # Clean up temp file
-            file_service.cleanup_temp_file(temp_file_path)
+        return AnalysisResponse(
+            success=True,
+            message="Analysis completed successfully",
+            risks=result.get("risks", {}),
+            summary=result.get("summary"),
+            total_risks_found=len([r for r in result.get("risks", {}).values() if r.get("count", 0) > 0]),
+            analysis_timestamp=datetime.now(UTC).isoformat() + "Z"
+        )
 
     @mcp.tool(
         name="analyze_json_data",
@@ -288,52 +280,38 @@ def setup_api_routes(
         # Validate file
         file_service.validate_file(file)
 
-        # Save uploaded file
-        temp_file_path = await file_service.save_uploaded_file(file)
+        # Load Excel file directly from memory (no temp file)
+        excel_data = await file_service.load_excel_file_from_memory(file)
 
-        try:
-            # Load Excel file
-            excel_data = file_service.load_excel_file(temp_file_path)
+        # Convert to simplified JSON format - just the data
+        json_result = {}
+        for sheet_name, sheet_info in excel_data.items():
+            # Get the data from the sheet
+            sheet_data = sheet_info.get('data', [])
 
-            # Convert to simplified JSON format - just the data
-            json_result = {}
-            for sheet_name, sheet_info in excel_data.items():
-                # Get the data from the sheet
-                sheet_data = sheet_info.get('data', [])
+            # Limit rows if specified
+            if max_rows_per_sheet and len(sheet_data) > max_rows_per_sheet:
+                sheet_data = sheet_data[:max_rows_per_sheet]
 
-                # Limit rows if specified
-                if max_rows_per_sheet and len(sheet_data) > max_rows_per_sheet:
-                    sheet_data = sheet_data[:max_rows_per_sheet]
+            # Process data based on include_empty_cells flag
+            if not include_empty_cells:
+                # Remove rows where all values are None/empty
+                filtered_data = []
+                for row in sheet_data:
+                    if any(value is not None and str(value).strip() != '' for value in row.values()):
+                        # Clean each value for JSON serialization
+                        cleaned_row = {k: clean_value_for_json(v) for k, v in row.items()}
+                        filtered_data.append(cleaned_row)
+                sheet_data = filtered_data
+            else:
+                # Still clean values even when including empty cells
+                sheet_data = [
+                    {k: clean_value_for_json(v) for k, v in row.items()}
+                    for row in sheet_data
+                ]
 
-                # Process data based on include_empty_cells flag
-                if not include_empty_cells:
-                    # Remove rows where all values are None/empty
-                    filtered_data = []
-                    for row in sheet_data:
-                        if any(value is not None and str(value).strip() != '' for value in row.values()):
-                            # Clean each value for JSON serialization
-                            cleaned_row = {k: clean_value_for_json(v) for k, v in row.items()}
-                            filtered_data.append(cleaned_row)
-                    sheet_data = filtered_data
-                else:
-                    # Still clean values even when including empty cells
-                    sheet_data = [
-                        {k: clean_value_for_json(v) for k, v in row.items()}
-                        for row in sheet_data
-                    ]
+            # Store only the data for this sheet
+            json_result[sheet_name] = sheet_data
 
-                # Store only the data for this sheet
-                json_result[sheet_name] = sheet_data
-
-            # Return simplified response with just the data
-            return json_result
-
-        except Exception as e:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Error converting Excel file to JSON: {str(e)}"
-            )
-
-        finally:
-            # Clean up temp file
-            file_service.cleanup_temp_file(temp_file_path)
+        # Return simplified response with just the data
+        return json_result

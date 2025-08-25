@@ -63,6 +63,12 @@ VMS = [
     # Standard VMs (good)
     {"name": "vm-web-server-01", "type": "web"},
     {"name": "vm-web-server-02", "type": "web", "memory": 16384, "provisioned": 204800},
+
+    # Password exposure VMs (critical security risk)
+    {"name": "vm-password-exposed-01", "type": "web", "annotation": "Admin user password is admin123 - change after deployment"},
+    {"name": "vm-password-exposed-02", "type": "web", "annotation": "Service account pwd: ServicePass456"},
+    {"name": "vm-password-exposed-03", "type": "web", "annotation": "Contains secret key and credentials for DB access"},
+    {"name": "vm-clean-annotation", "type": "web", "annotation": "Regular server configuration notes"},
     {"name": "vm-app-server-01", "type": "app", "os": "Ubuntu Linux 20.04"},
     {"name": "vm-app-server-02", "type": "app", "os": "Ubuntu Linux 22.04"},
 
@@ -101,7 +107,11 @@ SNAPSHOTS = [
     {"vm": "vm-web-server-01", "name": "Backup point", "desc": "Daily backup snapshot", "date": "2024-02-05 08:30:00", "size": 1024},
     {"vm": "vm-web-server-02", "name": "Security update prep", "desc": "Before security patch installation", "date": "2024-02-10 12:15:00", "size": 3072},
     {"vm": "vm-large-storage-01", "name": "Storage migration prep", "desc": "Before storage vMotion", "date": "2024-02-15 18:00:00", "size": 15360},
-    {"vm": "vm-mixed-issues-01", "name": "Multi-snapshot-vm", "desc": "Multiple snapshots for testing", "date": "2024-02-20 22:30:00", "size": 6144}
+    {"vm": "vm-mixed-issues-01", "name": "Multi-snapshot-vm", "desc": "Multiple snapshots for testing", "date": "2024-02-20 22:30:00", "size": 6144},
+    # Password exposure snapshots (critical security risk)
+    {"vm": "vm-password-exposed-01", "name": "Password reset point", "desc": "Before password change - old password was SecretPass123", "date": "2024-02-25 09:00:00", "size": 2048},
+    {"vm": "vm-password-exposed-02", "name": "Credential backup", "desc": "Service credentials updated - passphrase stored in config", "date": "2024-02-26 11:30:00", "size": 1536},
+    {"vm": "vm-clean-annotation", "name": "Clean snapshot", "desc": "Regular maintenance snapshot without sensitive data", "date": "2024-02-27 14:00:00", "size": 1024}
 ]
 
 # CD-ROM devices - just VM names that have CD-ROMs
@@ -203,7 +213,8 @@ def build_vinfo_sheet() -> pd.DataFrame:
             "Used MiB": in_use,
             "Datacenter": vm_data["datacenter"],
             "Cluster": vm_data["cluster"],
-            "Host": vm_data["host"]
+            "Host": vm_data["host"],
+            "Annotation": vm_data.get("annotation", "")
         })
     return pd.DataFrame(data)
 
