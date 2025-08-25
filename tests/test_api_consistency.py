@@ -6,22 +6,9 @@ Tests API endpoints and data structure consistency.
 """
 
 from avs_rvtools_analyzer.risk_detection import (
-    detect_esx_versions,
-    detect_vusb_devices,
-    detect_risky_disks,
-    detect_non_dvs_switches,
-    detect_snapshots,
-    detect_suspended_vms,
-    detect_oracle_vms,
-    detect_dvport_issues,
-    detect_non_intel_hosts,
-    detect_vmtools_not_running,
-    detect_cdrom_issues,
-    detect_large_provisioned_vms,
-    detect_high_vcpu_vms,
-    detect_high_memory_vms,
-    detect_hw_version_compatibility,
-    gather_all_risks
+    gather_all_risks,
+    get_total_risk_functions_count,
+    get_risk_functions_list
 )
 
 
@@ -30,13 +17,7 @@ class TestAPIDataStructureConsistency:
 
     def test_all_risk_functions_return_consistent_structure(self, comprehensive_excel_data):
         """Test that all risk detection functions return consistent data structures."""
-        risk_functions = [
-            detect_esx_versions, detect_vusb_devices, detect_risky_disks,
-            detect_non_dvs_switches, detect_snapshots, detect_suspended_vms,
-            detect_oracle_vms, detect_dvport_issues, detect_non_intel_hosts,
-            detect_vmtools_not_running, detect_cdrom_issues, detect_large_provisioned_vms,
-            detect_high_vcpu_vms, detect_high_memory_vms, detect_hw_version_compatibility
-        ]
+        risk_functions = get_risk_functions_list()
 
         for func in risk_functions:
             result = func(comprehensive_excel_data)
@@ -76,7 +57,9 @@ class TestAPIDataStructureConsistency:
 
         # Individual risks structure
         risks = result['risks']
-        assert len(risks) == 15, "Should have 15 risk detection results"
+        # Should have exactly the same number of risk detection results as available functions
+        expected_count = get_total_risk_functions_count()
+        assert len(risks) == expected_count, f"Should have {expected_count} risk detection results, found {len(risks)}"
 
         for func_name, risk_result in risks.items():
             assert isinstance(func_name, str), "Risk function name should be string"
@@ -95,13 +78,7 @@ class TestAPIDataStructureConsistency:
 
         empty_excel_data = MockEmptyExcelFile()
 
-        risk_functions = [
-            detect_esx_versions, detect_vusb_devices, detect_risky_disks,
-            detect_non_dvs_switches, detect_snapshots, detect_suspended_vms,
-            detect_oracle_vms, detect_dvport_issues, detect_non_intel_hosts,
-            detect_vmtools_not_running, detect_cdrom_issues, detect_large_provisioned_vms,
-            detect_high_vcpu_vms, detect_high_memory_vms, detect_hw_version_compatibility
-        ]
+        risk_functions = get_risk_functions_list()
 
         for func in risk_functions:
             try:

@@ -22,6 +22,7 @@ A unified FastAPI application for analyzing RVTools data with both web interface
   - Oracle VMs (info)
   - ESX version compatibility (dynamic)
   - VM Hardware version compatibility (blocking)
+  - Shared disks (blocking)
 
 ## AI integration disclaimer
 

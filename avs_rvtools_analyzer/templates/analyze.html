@@ -99,7 +99,7 @@
                                 {% for item in risk_data.data %}
                                     <tr>
                                         {% for key, value in item.items() %}
-                                            <td>
+                                            <td class="wrap">
                                                 {% if value is sameas true %}
                                                     <span class="text-success"><strong>✓</strong></span>
                                                 {% elif value is sameas false %}

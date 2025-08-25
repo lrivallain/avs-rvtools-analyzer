@@ -37,29 +37,54 @@ from .routes.api_routes import setup_api_routes
 from .core.error_handlers import setup_error_handlers
 from . import __version__ as calver_version
 
+
+def setup_logging(debug: bool = False):
+    """
+    Configure logging for the entire application.
+
+    Args:
+        debug: If True, set log level to DEBUG, otherwise INFO
+    """
+    # Set the root logger level
+    root_logger = logging.getLogger()
+    log_level = logging.DEBUG if debug else logging.INFO
+    root_logger.setLevel(log_level)
+
+    # Remove existing handlers to avoid duplication
+    for handler in root_logger.handlers[:]:
+        root_logger.removeHandler(handler)
+
+    # Create console handler with custom formatter
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(ColoredFormatter())
+    console_handler.setLevel(log_level)
+    root_logger.addHandler(console_handler)
+
+    # Configure specific loggers for our application modules
+    app_logger = logging.getLogger('avs_rvtools_analyzer')
+    app_logger.setLevel(log_level)
+
+    # Silence noisy third-party loggers unless in debug mode
+    if not debug:
+        logging.getLogger('urllib3').setLevel(logging.WARNING)
+        logging.getLogger('requests').setLevel(logging.WARNING)
+        logging.getLogger('fastapi').setLevel(logging.WARNING)
+
+
 # Set up logger with custom formatter
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-
-# Remove existing handlers to avoid duplication
-for handler in logger.handlers[:]:
-    logger.removeHandler(handler)
-
-# Create console handler with custom formatter
-console_handler = logging.StreamHandler()
-console_handler.setFormatter(ColoredFormatter())
-logger.addHandler(console_handler)
-
-# Prevent propagation to avoid duplicate logs
-logger.propagate = False
 
 
 class RVToolsAnalyzeServer:
     """HTTP/MCP API Server for AVS RVTools analysis capabilities with integrated web UI."""
 
-    def __init__(self, config: AppConfig = None):
+    def __init__(self, config: AppConfig = None, debug: bool = False):
         self.config = config or AppConfig()
+        self.debug = debug
         self.temp_files = []  # Track temporary files for cleanup
+
+        # Setup logging for the entire application
+        setup_logging(debug=debug)
 
         # Use configuration for paths
         self.base_dir = self.config.paths.base_dir
@@ -130,11 +155,15 @@ class RVToolsAnalyzeServer:
 
         # Run the FastAPI server
         import uvicorn
+
+        # Set uvicorn log level based on debug flag
+        uvicorn_log_level = "debug" if self.debug else self.config.server.log_level
+
         config = uvicorn.Config(
             app,
             host=host,
             port=port,
-            log_level=self.config.server.log_level,
+            log_level=uvicorn_log_level,
             timeout_graceful_shutdown=self.config.server.timeout_graceful_shutdown,
             reload=reload,
             reload_dirs=["avs_rvtools_analyzer"] if reload else None
@@ -169,10 +198,11 @@ async def server_main():
     parser.add_argument("--host", default=default_config.server.host, help=f"Host to bind to (default: {default_config.server.host})")
     parser.add_argument("--port", type=int, default=default_config.server.port, help=f"Port to bind to (default: {default_config.server.port})")
     parser.add_argument("--reload", action="store_true", help="Enable auto-reload for development")
+    parser.add_argument("--debug", action="store_true", help="Enable debug logging level")
 
     args = parser.parse_args()
 
-    server = RVToolsAnalyzeServer()
+    server = RVToolsAnalyzeServer(debug=args.debug)
     await server.run(host=args.host, port=args.port, reload=args.reload)
 
 

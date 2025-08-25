@@ -164,7 +164,7 @@ def create_comprehensive_test_data():
         ]
     })
 
-    # vDisk sheet - for risky disk configurations
+    # vDisk sheet - for risky disk configurations and shared disks
     sheets_data['vDisk'] = pd.DataFrame({
         'VM': [
             'vm-web-server-01', 'vm-web-server-02',
@@ -172,17 +172,84 @@ def create_comprehensive_test_data():
             'vm-app-server-01', 'vm-app-server-02',
             'vm-large-storage-01', 'vm-large-storage-02',
             'vm-risky-disk-01', 'vm-risky-disk-02',     # Risky disk configurations
-            'vm-mixed-issues-01', 'vm-baseline-good'
+            'vm-mixed-issues-01', 'vm-baseline-good',
+            # Shared disk VMs - 7 entries to match the 7 shared disk paths
+            'vm-cluster-node-01', 'vm-cluster-node-02',  # Sharing disk path 1
+            'vm-cluster-node-03', 'vm-cluster-node-04',  # Sharing disk path 2
+            'vm-shared-storage-01', 'vm-shared-storage-02', 'vm-shared-storage-03',  # Sharing disk path 3
+            # Additional VMs with individual shared bus configurations (not sharing paths)
+            'vm-individual-shared-01', 'vm-individual-shared-02'  # Individual shared bus VMs
         ],
-        'Powerstate': ['poweredOn'] * 12,
-        'Disk': ['Hard disk 1'] * 12,
-        'Capacity MiB': [51200, 102400, 102400, 204800, 25600, 51200, 10485760, 20971520, 51200, 102400, 51200, 25600],
-        'Raw': [False, False, False, False, False, False, False, False, True, True, False, False],  # Raw device mapping (risk)
+        'Powerstate': ['poweredOn'] * 21,
+        'Disk': ['Hard disk 1'] * 21,
+        'Capacity MiB': [51200, 102400, 102400, 204800, 25600, 51200, 10485760, 20971520, 51200, 102400, 51200, 25600,
+                        512000, 512000, 1024000, 1024000, 2048000, 2048000, 2048000,
+                        1024000, 512000],  # Additional capacity for new VMs
+        'Raw': [False, False, False, False, False, False, False, False, True, True, False, False,
+               False, False, False, False, False, False, False,
+               False, False],  # Additional Raw values for new VMs
         'Disk Mode': [
             'persistent', 'persistent', 'persistent', 'persistent',
             'persistent', 'persistent', 'persistent', 'persistent',
             'independent_persistent', 'independent_persistent',  # Independent mode (risk)
-            'independent_nonpersistent', 'persistent'
+            'independent_nonpersistent', 'persistent',
+            'persistent', 'persistent', 'persistent', 'persistent', 'persistent', 'persistent', 'persistent',
+            'persistent', 'persistent'  # Additional disk modes for new VMs
+        ],
+        'Path': [
+            '[datastore1] vm-web-server-01/vm-web-server-01.vmdk',
+            '[datastore1] vm-web-server-02/vm-web-server-02.vmdk',
+            '[datastore2] vm-db-oracle-01/vm-db-oracle-01.vmdk',
+            '[datastore2] vm-db-oracle-02/vm-db-oracle-02.vmdk',
+            '[datastore1] vm-app-server-01/vm-app-server-01.vmdk',
+            '[datastore1] vm-app-server-02/vm-app-server-02.vmdk',
+            '[datastore3] vm-large-storage-01/vm-large-storage-01.vmdk',
+            '[datastore3] vm-large-storage-02/vm-large-storage-02.vmdk',
+            '[datastore1] vm-risky-disk-01/vm-risky-disk-01.vmdk',
+            '[datastore1] vm-risky-disk-02/vm-risky-disk-02.vmdk',
+            '[datastore1] vm-mixed-issues-01/vm-mixed-issues-01.vmdk',
+            '[datastore1] vm-baseline-good/vm-baseline-good.vmdk',
+            # Shared disk paths - multiple VMs sharing same path (risk)
+            '[shared-datastore] cluster-shared-disk-01.vmdk',      # Shared by vm-cluster-node-01 and vm-cluster-node-02
+            '[shared-datastore] cluster-shared-disk-01.vmdk',      # Same path as above
+            '[shared-datastore] cluster-shared-disk-02.vmdk',      # Shared by vm-cluster-node-03 and vm-cluster-node-04
+            '[shared-datastore] cluster-shared-disk-02.vmdk',      # Same path as above
+            '[shared-datastore] multi-shared-storage.vmdk',        # Shared by 3 VMs
+            '[shared-datastore] multi-shared-storage.vmdk',        # Same path as above
+            '[shared-datastore] multi-shared-storage.vmdk',        # Same path as above
+            # Individual shared bus VMs (unique paths but shared bus configuration)
+            '[datastore4] vm-individual-shared-01/vm-individual-shared-01.vmdk',
+            '[datastore4] vm-individual-shared-02/vm-individual-shared-02.vmdk'
+        ],
+        'Sharing mode': [
+            'sharingNone', 'sharingNone', 'sharingNone',
+            'sharingNone', 'sharingNone', 'sharingNone',
+            'sharingNone', 'sharingNone', 'sharingNone',
+            'sharingNone', 'sharingNone', 'sharingNone',
+            'sharingMultiWriter', 'sharingMultiWriter',             # Multi-writer mode for shared disks
+            'sharingMultiWriter', 'sharingMultiWriter',
+            'sharingMultiWriter', 'sharingMultiWriter',
+            'sharingMultiWriter',
+            # Individual shared bus VMs
+            'sharingMultiWriter', 'sharingMultiWriter'  # Different sharing modes for individual VMs
+        ],
+        'Write Through': [
+            'False', 'False', 'False', 'False', 'False', 'False', 'False', 'False', 'False', 'False', 'False', 'False',
+            'True', 'True',                                       # Write through enabled
+            '', '',
+            '', '', '',
+            # Individual shared bus VMs
+            '', ''  # Write through settings for individual VMs
+        ],
+        'Shared Bus': [
+            'noSharing', 'noSharing', 'noSharing', 'noSharing',
+            'noSharing', 'noSharing', 'noSharing', 'noSharing',
+            'noSharing', 'noSharing', 'noSharing', 'noSharing',
+            'physicalSharing', 'physicalSharing',                     # Shared Bus
+            'virtualSharing', 'virtualSharing',
+            'physicalSharing', 'physicalSharing', 'physicalSharing',
+            # Individual shared bus VMs (these should be detected by the new logic)
+            'virtualSharing', 'physicalSharing'  # Individual VMs with shared bus configurations
         ]
     })
 
@@ -310,7 +377,8 @@ def create_comprehensive_test_data():
         "detect_large_provisioned_vms (vInfo - VMs >10TB)",
         "detect_high_vcpu_vms (vInfo - VMs with high CPU count)",
         "detect_high_memory_vms (vInfo - VMs with high memory)",
-        "detect_hw_version_compatibility (vInfo - VMs with old HW versions)"
+        "detect_hw_version_compatibility (vInfo - VMs with old HW versions)",
+        "detect_shared_disks (vDisk - VMs with shared disks)"
     ]
     for i, risk in enumerate(risk_functions, 1):
         print(f"   {i:2d}. {risk}")
