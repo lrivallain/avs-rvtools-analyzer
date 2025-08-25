@@ -7,22 +7,9 @@ Tests execution time and resource usage.
 
 import time
 from avs_rvtools_analyzer.risk_detection import (
-    detect_esx_versions,
-    detect_vusb_devices,
-    detect_risky_disks,
-    detect_non_dvs_switches,
-    detect_snapshots,
-    detect_suspended_vms,
-    detect_oracle_vms,
-    detect_dvport_issues,
-    detect_non_intel_hosts,
-    detect_vmtools_not_running,
-    detect_cdrom_issues,
-    detect_large_provisioned_vms,
-    detect_high_vcpu_vms,
-    detect_high_memory_vms,
-    detect_hw_version_compatibility,
-    gather_all_risks
+    gather_all_risks,
+    get_total_risk_functions_count,
+    get_risk_functions_list
 )
 
 
@@ -39,17 +26,12 @@ class TestPerformanceAndBenchmarks:
         assert execution_time < 10.0, f"Risk detection should complete in <10 seconds, took {execution_time:.2f}s"
 
         # Should still find all risks
-        assert len(result['risks']) == 15
+        expected_count = get_total_risk_functions_count()
+        assert len(result['risks']) == expected_count
 
     def test_individual_function_performance(self, comprehensive_excel_data):
         """Test that individual risk detection functions are reasonably fast."""
-        risk_functions = [
-            detect_esx_versions, detect_vusb_devices, detect_risky_disks,
-            detect_non_dvs_switches, detect_snapshots, detect_suspended_vms,
-            detect_oracle_vms, detect_dvport_issues, detect_non_intel_hosts,
-            detect_vmtools_not_running, detect_cdrom_issues, detect_large_provisioned_vms,
-            detect_high_vcpu_vms, detect_high_memory_vms, detect_hw_version_compatibility
-        ]
+        risk_functions = get_risk_functions_list()
 
         for func in risk_functions:
             start_time = time.time()

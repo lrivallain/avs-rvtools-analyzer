@@ -6,22 +6,23 @@ Tests global app behavior and risk gathering functionality.
 """
 
 import pytest
-from avs_rvtools_analyzer.risk_detection import gather_all_risks
+from avs_rvtools_analyzer.risk_detection import gather_all_risks, get_total_risk_functions_count
 
 
 class TestRiskGatheringIntegration:
     """Test global app behavior and risk gathering functionality."""
 
-    def test_gather_all_risks_finds_all_15_risks(self, comprehensive_excel_data):
-        """Test that all 15 risk types are detected."""
+    def test_gather_all_risks_finds_all_risks(self, comprehensive_excel_data):
+        """Test that all risk types are detected."""
         result = gather_all_risks(comprehensive_excel_data)
 
         assert 'summary' in result
         assert 'risks' in result
 
-        # Should have results for all 15 risk functions
+        # Should have results for all risk functions (dynamic count)
         risks = result['risks']
-        assert len(risks) == 15, f"Should have 15 risk types, found {len(risks)}"
+        expected_count = get_total_risk_functions_count()
+        assert len(risks) == expected_count, f"Should have {expected_count} risk types, found {len(risks)}"
 
         # Check that each risk type has proper structure
         expected_risk_functions = [
@@ -29,7 +30,8 @@ class TestRiskGatheringIntegration:
             'detect_non_dvs_switches', 'detect_snapshots', 'detect_suspended_vms',
             'detect_oracle_vms', 'detect_dvport_issues', 'detect_non_intel_hosts',
             'detect_vmtools_not_running', 'detect_cdrom_issues', 'detect_large_provisioned_vms',
-            'detect_high_vcpu_vms', 'detect_high_memory_vms', 'detect_hw_version_compatibility'
+            'detect_high_vcpu_vms', 'detect_high_memory_vms', 'detect_hw_version_compatibility',
+            'detect_shared_disks'
         ]
 
         for func_name in expected_risk_functions:

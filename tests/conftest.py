@@ -13,17 +13,30 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 
-def ensure_test_data_exists():
-    """Ensure comprehensive test data exists before running tests."""
+sys.path.append(str(Path(__file__).parent))
+from create_test_data import create_comprehensive_test_data
+
+
+def ensure_test_data_exists(force_recreate: bool = False):
+    """Ensure comprehensive test data exists before running tests.
+
+    Args:
+        force_recreate (bool): If True, will recreate the test data file even if it exists.
+
+    Returns:
+        Path: The path to the test data file.
+    """
     test_data_path = Path(__file__).parent / "test-data" / "comprehensive_test_data.xlsx"
 
     # Test folder exists
     if not test_data_path.parent.exists():
         test_data_path.parent.mkdir(parents=True)
 
-    # Always generate a new test data file
-    sys.path.append(str(Path(__file__).parent))
-    from create_test_data import create_comprehensive_test_data
+    # If file exists and not forced, return the existing file
+    if test_data_path.exists() and not force_recreate:
+        # Load existing test data
+        return test_data_path
+
     # Create the test data
     print(f"Creating test data at {test_data_path}")
     create_comprehensive_test_data()
@@ -34,7 +47,7 @@ def ensure_test_data_exists():
 @pytest.fixture(scope="session", autouse=True)
 def setup_test_data():
     """Automatically ensure test data exists before any tests run."""
-    ensure_test_data_exists()
+    ensure_test_data_exists(force_recreate=True)
 
 
 @pytest.fixture(scope="session")

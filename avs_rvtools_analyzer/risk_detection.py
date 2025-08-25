@@ -36,6 +36,7 @@ def detect_esx_versions(excel_data: pd.ExcelFile) -> Dict[str, Any]:
     """Detect ESX versions and their risk levels."""
     vhost_data = safe_sheet_access(excel_data, 'vHost')
     if vhost_data is None:
+        logger.warning("detect_esx_versions: No vHost sheet found")
         return create_empty_result()
 
     version_counts = vhost_data['ESX Version'].value_counts().to_dict()
@@ -56,6 +57,7 @@ def detect_esx_versions(excel_data: pd.ExcelFile) -> Dict[str, Any]:
             else:
                 version_risks[version_str] = "info"
 
+    logger.info(f"detect_esx_versions: Found {len(version_counts)} ESX versions with overall risk level: {card_risk}")
     return {
         'count': len(version_counts),
         'data': version_counts,
@@ -79,10 +81,12 @@ def detect_vusb_devices(excel_data: pd.ExcelFile) -> Dict[str, Any]:
     """Detect USB devices attached to VMs."""
     vusb_data = safe_sheet_access(excel_data, 'vUSB')
     if vusb_data is None:
+        logger.warning("detect_vusb_devices: No vUSB sheet found")
         return create_empty_result()
 
     devices = vusb_data[['VM', 'Powerstate', 'Device Type', 'Connected']].to_dict(orient='records')
 
+    logger.info(f"detect_vusb_devices: Found {len(devices)} USB devices attached to VMs")
     return {
         'count': len(devices),
         'data': devices
@@ -104,6 +108,7 @@ def detect_vusb_devices(excel_data: pd.ExcelFile) -> Dict[str, Any]:
 def detect_risky_disks(excel_data: pd.ExcelFile) -> Dict[str, Any]:
     """Detect disks with migration risks (raw or independent persistent)."""
     if 'vDisk' not in excel_data.sheet_names:
+        logger.info("detect_risky_disks: No vDisk sheet found")
         return {'count': 0, 'data': []}
 
     vdisk_data = excel_data.parse('vDisk')
@@ -150,6 +155,7 @@ def detect_risky_disks(excel_data: pd.ExcelFile) -> Dict[str, Any]:
     if blocking_count > 0:
         card_risk = "blocking"
 
+    logger.info(f"detect_risky_disks: Found {len(risky_disks)} risky disks (raw or independent persistent)")
     return {
         'count': len(risky_disks),
         'data': risky_disks,
@@ -171,6 +177,7 @@ def detect_risky_disks(excel_data: pd.ExcelFile) -> Dict[str, Any]:
 def detect_non_dvs_switches(excel_data: pd.ExcelFile) -> Dict[str, Any]:
     """Detect non-dvSwitch network interfaces."""
     if 'vNetwork' not in excel_data.sheet_names:
+        logger.warning("detect_non_dvs_switches: No vNetwork sheet found")
         return {'count': 0, 'data': []}
 
     vnetwork_data = excel_data.parse('vNetwork')
@@ -184,7 +191,6 @@ def detect_non_dvs_switches(excel_data: pd.ExcelFile) -> Dict[str, Any]:
         dvswitch_data = excel_data.parse('dvSwitch')
         if 'Switch' in dvswitch_data.columns:
             dvswitch_list = dvswitch_data['Switch'].dropna().unique()
-            logger.info(f"Found distributed switches: {list(dvswitch_list)}")
 
     # Add Switch Type classification
     vnetwork_data['Switch Type'] = vnetwork_data['Switch'].apply(
@@ -200,6 +206,7 @@ def detect_non_dvs_switches(excel_data: pd.ExcelFile) -> Dict[str, Any]:
     # Count VMs using non-distributed switches (individual ports/VMs)
     non_dvs_vm_count = len(vnetwork_data[vnetwork_data['Switch Type'] == 'Standard'])
 
+    logger.info(f"detect_non_dvs_switches: Found {non_dvs_vm_count} VMs using standard switches")
     if non_dvs_vm_count > 0:
         return {
             'count': non_dvs_vm_count,  # Count of VMs using standard switches
@@ -219,6 +226,7 @@ def detect_non_dvs_switches(excel_data: pd.ExcelFile) -> Dict[str, Any]:
 def detect_snapshots(excel_data: pd.ExcelFile) -> Dict[str, Any]:
     """Detect VM snapshots."""
     if 'vSnapshot' not in excel_data.sheet_names:
+        logger.warning("detect_snapshots: No vSnapshot sheet found")
         return {'count': 0, 'data': []}
 
     vsnapshot_sheet = excel_data.parse('vSnapshot')
@@ -226,6 +234,7 @@ def detect_snapshots(excel_data: pd.ExcelFile) -> Dict[str, Any]:
         ['VM', 'Powerstate', 'Name', 'Date / time', 'Size MiB (vmsn)', 'Description']
     ].to_dict(orient='records')
 
+    logger.info(f"detect_snapshots: Found {len(snapshots)} VM snapshots")
     return {
         'count': len(snapshots),
         'data': snapshots
@@ -242,11 +251,13 @@ def detect_snapshots(excel_data: pd.ExcelFile) -> Dict[str, Any]:
 def detect_suspended_vms(excel_data: pd.ExcelFile) -> Dict[str, Any]:
     """Detect suspended VMs."""
     if 'vInfo' not in excel_data.sheet_names:
+        logger.warning("detect_suspended_vms: No vInfo sheet found")
         return {'count': 0, 'data': []}
 
     vinfo_data = excel_data.parse('vInfo')
     suspended_vms = vinfo_data[vinfo_data['Powerstate'] == 'Suspended'][['VM']].to_dict(orient='records')
 
+    logger.info(f"detect_suspended_vms: Found {len(suspended_vms)} suspended VMs")
     return {
         'count': len(suspended_vms),
         'data': suspended_vms
@@ -263,6 +274,7 @@ def detect_suspended_vms(excel_data: pd.ExcelFile) -> Dict[str, Any]:
 def detect_oracle_vms(excel_data: pd.ExcelFile) -> Dict[str, Any]:
     """Detect Oracle VMs."""
     if 'vInfo' not in excel_data.sheet_names:
+        logger.warning("detect_oracle_vms: No vInfo sheet found")
         return {'count': 0, 'data': []}
 
     vinfo_data = excel_data.parse('vInfo')
@@ -270,6 +282,7 @@ def detect_oracle_vms(excel_data: pd.ExcelFile) -> Dict[str, Any]:
         vinfo_data['OS according to the VMware Tools'].str.contains('Oracle', na=False)
     ][['VM', 'OS according to the VMware Tools', 'Powerstate', 'CPUs', 'Memory', 'Provisioned MiB', 'In Use MiB']].to_dict(orient='records')
 
+    logger.info(f"detect_oracle_vms: Found {len(oracle_vms)} Oracle VMs")
     return {
         'count': len(oracle_vms),
         'data': oracle_vms
@@ -291,6 +304,7 @@ def detect_oracle_vms(excel_data: pd.ExcelFile) -> Dict[str, Any]:
 def detect_dvport_issues(excel_data: pd.ExcelFile) -> Dict[str, Any]:
     """Detect dvPort configuration issues."""
     if 'dvPort' not in excel_data.sheet_names:
+        logger.warning("detect_dvport_issues: No dvPort sheet found")
         return {'count': 0, 'data': []}
 
     dvport_data = excel_data.parse('dvPort')
@@ -314,6 +328,7 @@ def detect_dvport_issues(excel_data: pd.ExcelFile) -> Dict[str, Any]:
 
     issues = dvport_data[mask][available_columns].to_dict(orient='records')
 
+    logger.info(f"detect_dvport_issues: Found {len(issues)} dvPort configuration issues")
     return {
         'count': len(issues),
         'data': issues
@@ -329,6 +344,7 @@ def detect_dvport_issues(excel_data: pd.ExcelFile) -> Dict[str, Any]:
 def detect_non_intel_hosts(excel_data: pd.ExcelFile) -> Dict[str, Any]:
     """Detect non-Intel CPU hosts."""
     if 'vHost' not in excel_data.sheet_names:
+        logger.warning("detect_non_intel_hosts: No vHost sheet found")
         return {'count': 0, 'data': []}
 
     vhost_data = excel_data.parse('vHost')
@@ -336,6 +352,7 @@ def detect_non_intel_hosts(excel_data: pd.ExcelFile) -> Dict[str, Any]:
         ~vhost_data['CPU Model'].str.contains('Intel', na=False)
     ][['Host', 'Datacenter', 'Cluster', 'CPU Model', '# VMs']].to_dict(orient='records')
 
+    logger.info(f"detect_non_intel_hosts: Found {len(non_intel_hosts)} non-Intel hosts")
     return {
         'count': len(non_intel_hosts),
         'data': non_intel_hosts
@@ -352,6 +369,7 @@ def detect_non_intel_hosts(excel_data: pd.ExcelFile) -> Dict[str, Any]:
 def detect_vmtools_not_running(excel_data: pd.ExcelFile) -> Dict[str, Any]:
     """Detect VMs with VMware Tools not running."""
     if 'vInfo' not in excel_data.sheet_names:
+        logger.warning("detect_vmtools_not_running: No vInfo sheet found")
         return {'count': 0, 'data': []}
 
     vinfo_data = excel_data.parse('vInfo')
@@ -360,6 +378,7 @@ def detect_vmtools_not_running(excel_data: pd.ExcelFile) -> Dict[str, Any]:
         (vinfo_data['Guest state'] == 'notRunning')
     ][['VM', 'Powerstate', 'Guest state', 'OS according to the configuration file']].to_dict(orient='records')
 
+    logger.info(f"detect_vmtools_not_running: Found {len(vmtools_issues)} VMs with VMware Tools not running")
     return {
         'count': len(vmtools_issues),
         'data': vmtools_issues
@@ -375,6 +394,7 @@ def detect_vmtools_not_running(excel_data: pd.ExcelFile) -> Dict[str, Any]:
 def detect_cdrom_issues(excel_data: pd.ExcelFile) -> Dict[str, Any]:
     """Detect mounted CD/DVD drives."""
     if 'vCD' not in excel_data.sheet_names:
+        logger.warning("detect_cdrom_issues: No vCD sheet found")
         return {'count': 0, 'data': []}
 
     vcd_data = excel_data.parse('vCD')
@@ -388,6 +408,7 @@ def detect_cdrom_issues(excel_data: pd.ExcelFile) -> Dict[str, Any]:
 
     cdrom_issues = vcd_data[mask][available_columns].to_dict(orient='records')
 
+    logger.info(f"detect_cdrom_issues: Found {len(cdrom_issues)} VMs with connected CD-ROM devices")
     return {
         'count': len(cdrom_issues),
         'data': cdrom_issues
@@ -404,6 +425,7 @@ def detect_large_provisioned_vms(excel_data: pd.ExcelFile) -> Dict[str, Any]:
     """Detect VMs with large provisioned disks (>10TB)."""
     vm_data = safe_sheet_access(excel_data, 'vInfo')
     if vm_data is None:
+        logger.warning("detect_large_provisioned_vms: No vInfo sheet found")
         return create_empty_result()
 
     vm_data['Provisioned MiB'] = pd.to_numeric(vm_data['Provisioned MiB'], errors='coerce')
@@ -414,6 +436,7 @@ def detect_large_provisioned_vms(excel_data: pd.ExcelFile) -> Dict[str, Any]:
         ['VM', 'Provisioned MiB', 'In Use MiB', 'CPUs', 'Memory']
     ].to_dict(orient='records')
 
+    logger.info(f"detect_large_provisioned_vms: Found {len(large_vms)} VMs with >10TB provisioned storage")
     return {
         'count': len(large_vms),
         'data': large_vms
@@ -430,12 +453,14 @@ def detect_high_vcpu_vms(excel_data: pd.ExcelFile) -> Dict[str, Any]:
     """Detect VMs with high vCPU count."""
     vm_data = safe_sheet_access(excel_data, 'vInfo')
     if vm_data is None:
+        logger.warning("detect_high_vcpu_vms: No vInfo sheet found")
         return create_empty_result()
 
     # Load SKU data using cached function
     try:
         sku_data = load_sku_data()
     except FileNotFoundError:
+        logger.warning("detect_high_vcpu_vms: SKU data file not found")
         return {'count': 0, 'data': [], 'error': 'SKU data file not found'}
 
     vm_data['CPUs'] = pd.to_numeric(vm_data['CPUs'], errors='coerce')
@@ -453,6 +478,7 @@ def detect_high_vcpu_vms(excel_data: pd.ExcelFile) -> Dict[str, Any]:
             }
             high_vcpu_vms.append(vm_data_entry)
 
+    logger.info(f"detect_high_vcpu_vms: Found {len(high_vcpu_vms)} VMs with high vCPU count (>{min_cores} cores)")
     return {
         'count': len(high_vcpu_vms),
         'data': high_vcpu_vms
@@ -470,12 +496,14 @@ def detect_high_memory_vms(excel_data: pd.ExcelFile) -> Dict[str, Any]:
     """Detect VMs with high memory allocation."""
     vm_data = safe_sheet_access(excel_data, 'vInfo')
     if vm_data is None:
+        logger.warning("detect_high_memory_vms: No vInfo sheet found")
         return create_empty_result()
 
     # Load SKU data using cached function
     try:
         sku_data = load_sku_data()
     except FileNotFoundError:
+        logger.error("detect_high_memory_vms: SKU data file not found")
         return {'count': 0, 'data': [], 'error': 'SKU data file not found'}
 
     vm_data['Memory'] = pd.to_numeric(vm_data['Memory'], errors='coerce')
@@ -495,6 +523,7 @@ def detect_high_memory_vms(excel_data: pd.ExcelFile) -> Dict[str, Any]:
             }
             high_memory_vms.append(vm_data_entry)
 
+    logger.info(f"detect_high_memory_vms: Found {len(high_memory_vms)} VMs with high memory allocation (>{min_memory / 1024} GB)")
     return {
         'count': len(high_memory_vms),
         'data': high_memory_vms
@@ -512,11 +541,12 @@ def detect_hw_version_compatibility(excel_data: pd.ExcelFile) -> Dict[str, Any]:
     """Detect VMs with incompatible hardware versions for Azure VMware Solution migration."""
     vm_data = safe_sheet_access(excel_data, 'vInfo')
     if vm_data is None:
+        logger.warning("detect_hw_version_compatibility: No vInfo sheet found")
         return create_empty_result()
 
     # Check if HW version column exists
     if 'HW version' not in vm_data.columns:
-        logger.warning("HW version column not found in vInfo sheet")
+        logger.warning("detect_hw_version_compatibility: HW version column not found in vInfo sheet")
         return create_empty_result()
 
     # Filter VMs with hardware version issues
@@ -560,11 +590,119 @@ def detect_hw_version_compatibility(excel_data: pd.ExcelFile) -> Dict[str, Any]:
             logger.error(f"Could not parse hardware version '{hw_version}' for VM {vm.get('VM', 'Unknown')}: {e}")
             continue
 
-    logger.info(f"Found {len(incompatible_vms)} VMs with hardware version compatibility issues")
-
+    logger.info(f"detect_hw_version_compatibility: Found {len(incompatible_vms)} VMs with hardware version compatibility issues")
     return {
         'count': len(incompatible_vms),
         'data': incompatible_vms
+    }
+
+
+@risk_info(
+    level=RiskLevel.BLOCKING,
+    description='VMs sharing disks with the same path cannot be migrated.',
+    alert_message="""Virtual machines cannot be migrated while they are using a shared SCSI bus,
+    flagged for multi-writer, or configured for shared VMDK disk sharing."""
+)
+def detect_shared_disks(excel_data: pd.ExcelFile) -> Dict[str, Any]:
+    """Detect VMs with shared disk configurations."""
+    vdisk_data = safe_sheet_access(excel_data, 'vDisk')
+    if vdisk_data is None:
+        logger.warning("detect_shared_disks: No vDisk sheet found")
+        return create_empty_result()
+
+    # Check if required columns exist
+    required_columns = ['VM', 'Path']
+    if not all(col in vdisk_data.columns for col in required_columns):
+        logger.warning("detect_shared_disks: Required columns not found in vDisk sheet for shared disk detection")
+        return create_empty_result()
+
+    # Filter out rows with null or empty paths
+    vdisk_data = vdisk_data[vdisk_data['Path'].notna() & (vdisk_data['Path'] != '')]
+
+    # Group by path to find shared disks (same path used by multiple VMs)
+    path_groups = vdisk_data.groupby('Path')
+
+    shared_disk_groups = []
+    detected_vms = set()  # Track VMs already detected to avoid duplicates
+
+    # First, detect VMs sharing the same disk path
+    for path, group in path_groups:
+        unique_vms = group['VM'].unique()
+        if len(unique_vms) > 1:  # Multiple VMs sharing the same path
+            # Create a summary for this shared disk group
+            shared_disk_info = {
+                'Path': path,
+                'VM Count': len(unique_vms),
+                'VMs': ', '.join(sorted(unique_vms))
+            }
+
+            # Add VMs to detected set
+            detected_vms.update(unique_vms)
+
+            # Add optional information if available
+            if 'Sharing mode' in group.columns:
+                sharing_modes = group['Sharing mode'].dropna()
+                if len(sharing_modes) > 0:
+                    # Take the first non-empty value as example
+                    shared_disk_info['Sharing mode'] = str(sharing_modes.iloc[0])
+                else:
+                    shared_disk_info['Sharing mode'] = ''
+
+            if 'Write Through' in group.columns:
+                write_through_values = group['Write Through'].dropna()
+                if len(write_through_values) > 0:
+                    # Take the first non-empty value as example
+                    shared_disk_info['Write Through'] = str(write_through_values.iloc[0])
+                else:
+                    shared_disk_info['Write Through'] = ''
+
+            if 'Shared Bus' in group.columns:
+                shared_bus_values = group['Shared Bus'].dropna()
+                if len(shared_bus_values) > 0:
+                    # Take the first non-empty value as example
+                    shared_disk_info['Shared Bus'] = str(shared_bus_values.iloc[0])
+                else:
+                    shared_disk_info['Shared Bus'] = ''
+
+            shared_disk_groups.append(shared_disk_info)
+
+    # Second, detect VMs with Shared Bus != "noSharing" that weren't already detected
+    if 'Shared Bus' in vdisk_data.columns:
+        # Filter for VMs with sharing bus configurations that are not "noSharing"
+        sharing_bus_mask = (
+            vdisk_data['Shared Bus'].notna() &
+            (vdisk_data['Shared Bus'] != '') &
+            (vdisk_data['Shared Bus'].astype(str).str.lower() != 'nosharing')
+        )
+
+        sharing_bus_vms = vdisk_data[sharing_bus_mask]
+
+        for _, row in sharing_bus_vms.iterrows():
+            vm_name = row['VM']
+            if vm_name not in detected_vms:  # Only add if not already detected
+                shared_disk_info = {
+                    'Path': row['Path'],
+                    'VM Count': 1,
+                    'VMs': vm_name
+                }
+
+                # Add the specific sharing information in the correct order
+                if 'Sharing mode' in row.index:
+                    shared_disk_info['Sharing mode'] = str(row['Sharing mode']) if pd.notna(row['Sharing mode']) else ''
+
+                if 'Write Through' in row.index:
+                    shared_disk_info['Write Through'] = str(row['Write Through']) if pd.notna(row['Write Through']) else ''
+
+                shared_disk_info['Shared Bus'] = str(row['Shared Bus'])
+
+                shared_disk_groups.append(shared_disk_info)
+
+                detected_vms.add(vm_name)
+
+    logger.info(f"detect_shared_disks: Found {len(shared_disk_groups)} shared disk configurations")
+    return {
+        'count': len(shared_disk_groups),
+        'data': shared_disk_groups
     }
 
 
@@ -574,14 +712,14 @@ def detect_hw_version_compatibility(excel_data: pd.ExcelFile) -> Dict[str, Any]:
 #                                                                                                                      #
 ########################################################################################################################
 
-def get_available_risks() -> Dict[str, Any]:
+def get_risk_functions_list() -> List:
     """
-    Get information about all available risk detection functions.
+    Get the centralized list of all risk detection functions.
 
     Returns:
-        Dictionary containing metadata about each risk detection function
+        List of risk detection functions
     """
-    risk_functions = [
+    return [
         detect_esx_versions,
         detect_vusb_devices,
         detect_risky_disks,
@@ -597,7 +735,26 @@ def get_available_risks() -> Dict[str, Any]:
         detect_high_vcpu_vms,
         detect_high_memory_vms,
         detect_hw_version_compatibility,
+        detect_shared_disks,
     ]
+
+def get_total_risk_functions_count() -> int:
+    """
+    Get the total number of available risk detection functions.
+
+    Returns:
+        Integer count of risk detection functions
+    """
+    return len(get_risk_functions_list())
+
+def get_available_risks() -> Dict[str, Any]:
+    """
+    Get information about all available risk detection functions.
+
+    Returns:
+        Dictionary containing metadata about each risk detection function
+    """
+    risk_functions = get_risk_functions_list()
 
     available_risks = {}
     risk_levels_count = {'info': 0, 'warning': 0, 'danger': 0, 'blocking': 0}
@@ -639,23 +796,7 @@ def gather_all_risks(excel_data: pd.ExcelFile) -> Dict[str, Any]:
     Returns:
         Dictionary containing all risk detection results
     """
-    risk_functions = [
-        detect_esx_versions,
-        detect_vusb_devices,
-        detect_risky_disks,
-        detect_non_dvs_switches,
-        detect_snapshots,
-        detect_suspended_vms,
-        detect_oracle_vms,
-        detect_dvport_issues,
-        detect_non_intel_hosts,
-        detect_vmtools_not_running,
-        detect_cdrom_issues,
-        detect_large_provisioned_vms,
-        detect_high_vcpu_vms,
-        detect_high_memory_vms,
-        detect_hw_version_compatibility,
-    ]
+    risk_functions = get_risk_functions_list()
 
     results = {}
     summary = {'total_risks': 0, 'risk_levels': {'info': 0, 'warning': 0, 'danger': 0, 'blocking': 0}}

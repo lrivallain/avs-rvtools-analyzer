@@ -1,325 +1,389 @@
 #!/usr/bin/env python3
 """
-Script to generate comprehensive test data for AVS RVTools Analyzer.
-Creates an Excel file with all sheets and data needed to trigger all risk detections.
+Simple data-driven test data generator for AVS RVTools Analyzer.
+Uses pure data definitions with minimal code.
 """
 
 import pandas as pd
 from pathlib import Path
+from typing import Optional
 
-def create_comprehensive_test_data():
-    """Create a comprehensive Excel file with data to trigger all risk detections."""
 
-    # Define the data for each sheet
-    sheets_data = {}
+# =============================================================================
+# DATA DEFINITIONS - Just modify these to change test data
+# =============================================================================
 
-    # vHost sheet - for ESX versions and host-related risks
-    sheets_data['vHost'] = pd.DataFrame({
-        'ESX Version': [
-            'VMware ESXi 6.5.0',     # Old version (blocking risk)
-            'VMware ESXi 6.7.0',     # Old version (blocking risk)
-            'VMware ESXi 7.0.3',     # Newer version
-            'VMware ESXi 7.0.3',     # Duplicate version
-            'VMware ESXi 8.0.1',     # Latest version
-            'VMware ESXi 8.0.2',     # Latest version
-        ],
-        'CPU Model': [
-            'AMD EPYC 7402P',         # Non-Intel host (risk)
-            'AMD EPYC 7543',          # Non-Intel host (risk)
-            'Intel Xeon Gold 6254',   # Intel host (good)
-            'Intel Xeon Gold 6348',   # Intel host (good)
-            'Intel Xeon Platinum 8380',  # Intel host (good)
-            'Intel Xeon Platinum 8480+', # Intel host (good)
-        ],
-        'Host': ['esxi-host-01', 'esxi-host-02', 'esxi-host-03', 'esxi-host-04', 'esxi-host-05', 'esxi-host-06'],
-        'Datacenter': ['DC-Primary', 'DC-Primary', 'DC-Primary', 'DC-Secondary', 'DC-Secondary', 'DC-Tertiary'],
-        'Cluster': ['Cluster-01', 'Cluster-01', 'Cluster-01', 'Cluster-02', 'Cluster-02', 'Cluster-03'],
-        '# VMs': [15, 12, 8, 6, 10, 4]
-    })
+# Base VM definitions - simple list of VMs with their properties
+VMS = [
+    # Oracle VMs (risk)
+    {"name": "vm-db-oracle-01", "type": "oracle", "os": "Oracle Linux Server 8.5", "os_config": "Oracle Linux 8 (64-bit)"},
+    {"name": "vm-db-oracle-02", "type": "oracle", "os": "Oracle Linux Server 9.1", "os_config": "Oracle Linux 9 (64-bit)"},
 
-    # vInfo sheet - main VM information for most risk detections
-    sheets_data['vInfo'] = pd.DataFrame({
-        'VM': [
-            'vm-web-server-01',
-            'vm-web-server-02',
-            'vm-db-oracle-01',          # Oracle VM (risk)
-            'vm-db-oracle-02',          # Oracle VM (risk)
-            'vm-app-server-01',
-            'vm-app-server-02',
-            'vm-large-storage-01',      # Large provisioned (risk)
-            'vm-large-storage-02',      # Large provisioned (risk)
-            'vm-high-cpu-01',           # High vCPU (risk)
-            'vm-high-cpu-02',           # High vCPU (risk)
-            'vm-high-memory-01',        # High memory (risk)
-            'vm-high-memory-02',        # High memory (risk)
-            'vm-old-hw-01',             # Old hardware version (blocking risk)
-            'vm-old-hw-02',             # Old hardware version (blocking risk)
-            'vm-suspended-01',          # Suspended VM (blocking risk)
-            'vm-suspended-02',          # Suspended VM (blocking risk)
-            'vm-tools-issue-01',        # VMware Tools not running (risk)
-            'vm-tools-issue-02',        # VMware Tools not running (risk)
-            'vm-mixed-issues-01',       # Multiple risks in one VM
-            'vm-baseline-good',         # Good VM for comparison
-        ],
-        'Powerstate': [
-            'poweredOn', 'poweredOn', 'poweredOn', 'poweredOn',
-            'poweredOn', 'poweredOn', 'poweredOn', 'poweredOn',
-            'poweredOn', 'poweredOn', 'poweredOn', 'poweredOn',
-            'poweredOff', 'poweredOff', 'Suspended', 'Suspended',
-            'poweredOn', 'poweredOn', 'poweredOn', 'poweredOn'
-        ],
-        'Guest state': [
-            'running', 'running', 'running', 'running',
-            'running', 'running', 'running', 'running',
-            'running', 'running', 'running', 'running',
-            'notRunning', 'notRunning', 'notRunning', 'notRunning',
-            'notRunning', 'notRunning', 'notRunning', 'running'  # VMware Tools not running (risk)
-        ],
-        'OS according to the VMware Tools': [
-            'Microsoft Windows Server 2019', 'Microsoft Windows Server 2022',
-            'Oracle Linux Server 8.5', 'Oracle Linux Server 9.1',  # Oracle OS (risk)
-            'Ubuntu Linux 20.04', 'Ubuntu Linux 22.04',
-            'Microsoft Windows Server 2022', 'CentOS Linux 8',
-            'Red Hat Enterprise Linux 8.6', 'Red Hat Enterprise Linux 9.1',
-            'Microsoft Windows Server 2016', 'Microsoft Windows Server 2019',
-            'Microsoft Windows Server 2012', 'Microsoft Windows Server 2008',
-            'Microsoft Windows 10', 'Microsoft Windows 11',
-            'Ubuntu Linux 18.04', 'Debian GNU/Linux 11',
-            'Oracle Linux Server 7.9', 'Microsoft Windows Server 2022'
-        ],
-        'OS according to the configuration file': [  # Required for detect_vmtools_not_running
-            'Microsoft Windows Server 2019 (64-bit)', 'Microsoft Windows Server 2022 (64-bit)',
-            'Oracle Linux 8 (64-bit)', 'Oracle Linux 9 (64-bit)',
-            'Ubuntu Linux (64-bit)', 'Ubuntu Linux (64-bit)',
-            'Microsoft Windows Server 2022 (64-bit)', 'CentOS 8 (64-bit)',
-            'Red Hat Enterprise Linux 8 (64-bit)', 'Red Hat Enterprise Linux 9 (64-bit)',
-            'Microsoft Windows Server 2016 (64-bit)', 'Microsoft Windows Server 2019 (64-bit)',
-            'Microsoft Windows Server 2012 (64-bit)', 'Microsoft Windows Server 2008 (64-bit)',
-            'Microsoft Windows 10 (64-bit)', 'Microsoft Windows 11 (64-bit)',
-            'Ubuntu Linux (64-bit)', 'Debian GNU/Linux 11 (64-bit)',
-            'Oracle Linux 7 (64-bit)', 'Microsoft Windows Server 2022 (64-bit)'
-        ],
-        'HW version': [
-            13, 15, 14, 16, 17, 18, 13, 15,        # Mix of good versions
-            14, 16, 17, 18, 6, 7, 11, 8,          # Old versions (risk)
-            12, 10, 6, 17                          # Mix including very old
-        ],
-        'CPUs': [
-            4, 8, 2, 4, 4, 2, 8, 4,               # Normal CPU counts
-            72, 64, 8, 4, 2, 4, 4, 2,             # High CPU counts (risk)
-            2, 4, 80, 8                            # Mix including very high
-        ],
-        'Memory': [
-            8192, 16384, 4096, 8192, 8192, 4096, 8192, 16384,     # Normal memory
-            8192, 8192, 1048576, 786432, 4096, 8192, 8192, 4096,  # High memory (risk)
-            4096, 8192, 1572864, 16384                             # Mix including very high
-        ],
-        'Provisioned MiB': [
-            102400, 204800, 51200, 102400, 102400, 51200, 10737418240, 10737418240,  # Large provisioned (risk)
-            102400, 204800, 204800, 102400, 51200, 102400, 102400, 51200,
-            102400, 204800, 10737418240, 102400
-        ],
-        'In Use MiB': [
-            51200, 102400, 25600, 51200, 51200, 25600, 5368709120, 5368709120,
-            51200, 102400, 102400, 51200, 25600, 51200, 51200, 25600,
-            51200, 102400, 5368709120, 51200
-        ],
-        'Used MiB': [
-            51200, 102400, 25600, 51200, 51200, 25600, 5368709120, 5368709120,
-            51200, 102400, 102400, 51200, 25600, 51200, 51200, 25600,
-            51200, 102400, 5368709120, 51200
-        ],
-        'Datacenter': [
-            'DC-Primary', 'DC-Primary', 'DC-Primary', 'DC-Primary', 'DC-Primary', 'DC-Primary',
-            'DC-Primary', 'DC-Secondary', 'DC-Secondary', 'DC-Secondary', 'DC-Secondary', 'DC-Secondary',
-            'DC-Primary', 'DC-Primary', 'DC-Primary', 'DC-Secondary', 'DC-Tertiary', 'DC-Tertiary',
-            'DC-Tertiary', 'DC-Primary'
-        ],
-        'Cluster': [
-            'Cluster-01', 'Cluster-01', 'Cluster-01', 'Cluster-01', 'Cluster-01', 'Cluster-01',
-            'Cluster-02', 'Cluster-02', 'Cluster-02', 'Cluster-02', 'Cluster-02', 'Cluster-02',
-            'Cluster-01', 'Cluster-01', 'Cluster-01', 'Cluster-02', 'Cluster-03', 'Cluster-03',
-            'Cluster-03', 'Cluster-01'
-        ],
-        'Host': [
-            'esxi-host-01', 'esxi-host-01', 'esxi-host-02', 'esxi-host-02', 'esxi-host-01', 'esxi-host-03',
-            'esxi-host-03', 'esxi-host-04', 'esxi-host-04', 'esxi-host-05', 'esxi-host-05', 'esxi-host-06',
-            'esxi-host-01', 'esxi-host-02', 'esxi-host-02', 'esxi-host-04', 'esxi-host-06', 'esxi-host-06',
-            'esxi-host-06', 'esxi-host-01'
-        ]
-    })
+    # Suspended VMs (blocking risk)
+    {"name": "vm-suspended-01", "type": "suspended", "powerstate": "Suspended", "guest_state": "notRunning", "hw_version": 11},
+    {"name": "vm-suspended-02", "type": "suspended", "powerstate": "Suspended", "guest_state": "notRunning", "hw_version": 8},
 
-    # vUSB sheet - for USB device risks
-    sheets_data['vUSB'] = pd.DataFrame({
-        'VM': ['vm-web-server-01', 'vm-app-server-01', 'vm-db-oracle-01', 'vm-app-server-02', 'vm-mixed-issues-01'],
-        'Powerstate': ['poweredOn', 'poweredOn', 'poweredOn', 'poweredOn', 'poweredOn'],
-        'Device Type': ['USB Controller', 'USB Mass Storage', 'USB Smart Card Reader', 'USB Printer', 'USB Hub'],
-        'Connected': [True, True, True, False, True],
-        'Path': [
-            '/vmfs/devices/usb/001/001',
-            '/vmfs/devices/usb/002/001',
-            '/vmfs/devices/usb/003/001',
-            '/vmfs/devices/usb/004/001',
-            '/vmfs/devices/usb/005/001'
-        ]
-    })
+    # Old hardware VMs (blocking risk)
+    {"name": "vm-old-hw-01", "type": "old_hw", "hw_version": 6, "powerstate": "poweredOff", "guest_state": "notRunning"},
+    {"name": "vm-old-hw-02", "type": "old_hw", "hw_version": 7, "powerstate": "poweredOff", "guest_state": "notRunning"},
 
-    # vDisk sheet - for risky disk configurations
-    sheets_data['vDisk'] = pd.DataFrame({
-        'VM': [
-            'vm-web-server-01', 'vm-web-server-02',
-            'vm-db-oracle-01', 'vm-db-oracle-02',
-            'vm-app-server-01', 'vm-app-server-02',
-            'vm-large-storage-01', 'vm-large-storage-02',
-            'vm-risky-disk-01', 'vm-risky-disk-02', 'vm-risky-disk-03', 'vm-risky-disk-04',     # Risky disk configurations
-            'vm-mixed-issues-01', 'vm-baseline-good'
-        ],
-        'Powerstate': ['poweredOn'] * 14,
-        'Disk': ['Hard disk 1'] * 14,
-        'Capacity MiB': [51200, 102400, 102400, 204800, 25600, 51200, 10485760, 20971520, 51200, 102400, 25600, 51200, 51200, 25600],
-        'Raw': [False, False, False, False, False, False, False, False, True, True, True, True, False, False],  # Raw device mapping (risk)
-        'Raw Com. Mode': [
-            '', '', '', '', '', '', '', '',  # Non-raw disks have empty Raw Com. Mode
-            'physicalMode', 'virtualMode', 'physicalMode', 'virtualMode',  # Raw disks with different compatibility modes
-            '', ''  # Non-raw disks
-        ],
-        'Disk Mode': [
-            'persistent', 'persistent', 'persistent', 'persistent',
-            'persistent', 'persistent', 'persistent', 'persistent',
-            'persistent', 'persistent', 'persistent', 'persistent',  # Raw disks in persistent mode
-            'independent_persistent', 'persistent'  # Independent mode (risk) and normal
-        ]
-    })
+    # High CPU VMs (risk)
+    {"name": "vm-high-cpu-01", "type": "high_cpu", "cpus": 72, "os": "Red Hat Enterprise Linux 8.6"},
+    {"name": "vm-high-cpu-02", "type": "high_cpu", "cpus": 64, "os": "Red Hat Enterprise Linux 9.1"},
 
-    # dvSwitch and vNetwork sheets - for network switch risks
-    sheets_data['dvSwitch'] = pd.DataFrame({
-        'Switch': ['dvSwitch-01', 'dvSwitch-02'],  # Note: Switch column not Name
-        'Name': ['dvSwitch-01', 'dvSwitch-02'],
-        'Type': ['Distributed Virtual Switch', 'Distributed Virtual Switch'],
-        'Version': ['7.0.3', '8.0.1'],
-        'Datacenter': ['DC-Primary', 'DC-Secondary']
-    })
+    # High memory VMs (risk)
+    {"name": "vm-high-memory-01", "type": "high_memory", "memory": 1048576},  # 1TB
+    {"name": "vm-high-memory-02", "type": "high_memory", "memory": 786432},   # 768GB
 
-    sheets_data['vNetwork'] = pd.DataFrame({
-        'VM': [
-            'vm-standard-switch-01', 'vm-standard-switch-02', 'vm-standard-switch-03',
-            'vm-web-server-01', 'vm-web-server-02', 'vm-db-oracle-01',
-            'vm-app-server-01', 'vm-mixed-issues-01', 'vm-baseline-good'
-        ],
-        'Network Label': [
-            'VM Network', 'Management Network', 'Storage Network',
-            'Production-VLAN-100', 'Production-VLAN-200', 'Database-VLAN-300',
-            'Application-VLAN-400', 'Legacy-Network', 'Modern-DVS-Network'
-        ],
-        'Switch': [
-            'vSwitch0', 'vSwitch1', 'vSwitch2',  # Three standard vSwitches (risk)
-            'dvSwitch-01', 'dvSwitch-01', 'dvSwitch-02',
-            'dvSwitch-02', 'vSwitch0', 'dvSwitch-01'
-        ],
-        'Connected': [True] * 9,
-        'Status': ['Connected'] * 9
-    })
+    # Large storage VMs (risk)
+    {"name": "vm-large-storage-01", "type": "large_storage", "provisioned": 10737418240, "capacity": 10485760},  # >10TB
+    {"name": "vm-large-storage-02", "type": "large_storage", "provisioned": 20971520000, "capacity": 20971520},  # >20TB
 
-    # vSnapshot sheet - for snapshot risks
-    sheets_data['vSnapshot'] = pd.DataFrame({
-        'VM': [
-            'vm-db-oracle-01', 'vm-db-oracle-02', 'vm-app-server-01', 'vm-app-server-02',
-            'vm-web-server-01', 'vm-web-server-02', 'vm-large-storage-01', 'vm-mixed-issues-01'
-        ],
-        'Powerstate': ['poweredOn'] * 8,
-        'Name': [
-            'Pre-patch snapshot', 'Database backup point', 'Before upgrade', 'Performance baseline',
-            'Backup point', 'Security update prep', 'Storage migration prep', 'Multi-snapshot-vm'
-        ],
-        'Description': [
-            'Created before monthly patching',
-            'Before database schema upgrade',
-            'Before application upgrade',
-            'Baseline before performance tuning',
-            'Daily backup snapshot',
-            'Before security patch installation',
-            'Before storage vMotion',
-            'Multiple snapshots for testing'
-        ],
-        'Date / time': [
-            '2024-01-15 10:30:00', '2024-01-20 14:15:00', '2024-01-25 02:00:00', '2024-02-01 16:45:00',
-            '2024-02-05 08:30:00', '2024-02-10 12:15:00', '2024-02-15 18:00:00', '2024-02-20 22:30:00'
-        ],
-        'Size MiB (vmsn)': [5120, 8192, 2048, 4096, 1024, 3072, 15360, 6144]
-    })
+    # VMware Tools issues (risk)
+    {"name": "vm-tools-issue-01", "type": "tools_issue", "guest_state": "notRunning", "os": "Ubuntu Linux 18.04"},
+    {"name": "vm-tools-issue-02", "type": "tools_issue", "guest_state": "notRunning", "os": "Debian GNU/Linux 11"},
 
-    # dvPort sheet - for distributed virtual port issues
-    sheets_data['dvPort'] = pd.DataFrame({
-        'VM': [
-            'vm-web-server-01', 'vm-db-oracle-01', 'vm-risky-port-01', 'vm-risky-port-02',
-            'vm-app-server-01', 'vm-security-risk-01', 'vm-ephemeral-risk-01', 'vm-ephemeral-risk-02', 'vm-baseline-good'
-        ],
-        'Port': ['50000001', '50000002', '50000003', '50000004', '50000005', '50000006', '50000007', '50000008', '50000009'],
-        'Switch': ['dvSwitch-01'] * 9,
-        'Object ID': ['1001', '1002', '1003', '1004', '1005', '1006', '1007', '1008', '1009'],
-        'Type': ['earlyBinding', 'earlyBinding', 'ephemeral', 'ephemeral', 'earlyBinding', 'earlyBinding', 'ephemeral', 'ephemeral', 'earlyBinding'],  # Ephemeral types (HCX migration risk)
-        'VLAN': [100, None, 200, None, 300, 400, 500, 600, 700],  # Null VLANs (risk)
-        'Allow Promiscuous': ['False', 'True', 'False', 'False', 'False', 'True', 'False', 'False', 'False'],  # Promiscuous mode (risk)
-        'Mac Changes': ['False', 'False', 'True', 'False', 'False', 'True', 'False', 'False', 'False'],  # MAC changes (risk)
-        'Forged Transmits': ['False', 'True', 'False', 'True', 'False', 'True', 'False', 'False', 'False'],  # Forged transmits (risk)
-        'Connected': [True, True, False, True, True, True, True, True, True],
-        'Status': ['Connected', 'Connected', 'Disconnected', 'Connected', 'Connected', 'Connected', 'Connected', 'Connected', 'Connected']
-    })
+    # Shared disk VMs (risk)
+    {"name": "vm-cluster-node-01", "type": "shared_disk", "shared_group": "cluster1"},
+    {"name": "vm-cluster-node-02", "type": "shared_disk", "shared_group": "cluster1"},
+    {"name": "vm-cluster-node-03", "type": "shared_disk", "shared_group": "cluster2"},
+    {"name": "vm-cluster-node-04", "type": "shared_disk", "shared_group": "cluster2"},
+    {"name": "vm-shared-storage-01", "type": "shared_disk", "shared_group": "multi_shared"},
+    {"name": "vm-shared-storage-02", "type": "shared_disk", "shared_group": "multi_shared"},
+    {"name": "vm-shared-storage-03", "type": "shared_disk", "shared_group": "multi_shared"},
+    {"name": "vm-individual-shared-01", "type": "individual_shared"},
+    {"name": "vm-individual-shared-02", "type": "individual_shared"},
 
-    # vCD sheet - for CD-ROM device risks
-    sheets_data['vCD'] = pd.DataFrame({
-        'VM': [
-            'vm-app-server-01', 'vm-web-server-01', 'vm-db-oracle-01', 'vm-db-oracle-02',
-            'vm-mixed-issues-01', 'vm-iso-mounted-01', 'vm-baseline-good'
-        ],
-        'Powerstate': ['poweredOn'] * 7,
-        'Connected': ['True', 'False', 'True', 'True', 'True', 'True', 'False'],  # String values, risk when "True"
-        'Starts Connected': ['True', 'False', 'True', 'True', 'True', 'False', 'False'],
-        'ISO Path': [
-            '[datastore1] iso/windows-server-2019.iso',
-            '',
-            '[datastore2] iso/oracle-linux-8.5.iso',
-            '[datastore1] iso/oracle-database-19c.iso',
-            '[datastore3] iso/mixed-tools.iso',
-            '[datastore1] iso/vmware-tools.iso',
-            ''
-        ],
-        'Device Type': ['CD/DVD drive'] * 7
-    })
+    # Risky disk VMs
+    {"name": "vm-risky-disk-01", "type": "raw_disk", "disk_raw": True, "disk_raw_mode": "physicalMode"},
+    {"name": "vm-risky-disk-02", "type": "raw_disk", "disk_raw": True, "disk_raw_mode": "virtualMode"},
+    {"name": "vm-risky-disk-03", "type": "raw_disk", "disk_raw": True, "disk_raw_mode": "physicalMode"},
+    {"name": "vm-risky-disk-04", "type": "independent_disk", "disk_mode": "independent_persistent"},
 
-    # Create the Excel file
-    output_path = Path(__file__).parent / 'test-data' / 'comprehensive_test_data.xlsx'
+    # Standard VMs (good)
+    {"name": "vm-web-server-01", "type": "web"},
+    {"name": "vm-web-server-02", "type": "web", "memory": 16384, "provisioned": 204800},
+    {"name": "vm-app-server-01", "type": "app", "os": "Ubuntu Linux 20.04"},
+    {"name": "vm-app-server-02", "type": "app", "os": "Ubuntu Linux 22.04"},
 
+    # Mixed issues VM
+    {"name": "vm-mixed-issues-01", "type": "mixed", "os": "Oracle Linux Server 7.9", "hw_version": 6, "cpus": 80, "memory": 1572864, "provisioned": 10737418240},
+
+    # Baseline
+    {"name": "vm-baseline-good", "type": "baseline"}
+]
+
+# Host definitions
+HOSTS = [
+    {"name": "esxi-host-01", "esx_version": "VMware ESXi 6.5.0", "cpu_model": "AMD EPYC 7402P", "datacenter": "DC-Primary", "cluster": "Cluster-01"},
+    {"name": "esxi-host-02", "esx_version": "VMware ESXi 6.7.0", "cpu_model": "AMD EPYC 7543", "datacenter": "DC-Primary", "cluster": "Cluster-01"},
+    {"name": "esxi-host-03", "esx_version": "VMware ESXi 7.0.3", "cpu_model": "Intel Xeon Gold 6254", "datacenter": "DC-Primary", "cluster": "Cluster-01"},
+    {"name": "esxi-host-04", "esx_version": "VMware ESXi 7.0.3", "cpu_model": "Intel Xeon Gold 6348", "datacenter": "DC-Secondary", "cluster": "Cluster-02"},
+    {"name": "esxi-host-05", "esx_version": "VMware ESXi 8.0.1", "cpu_model": "Intel Xeon Platinum 8380", "datacenter": "DC-Secondary", "cluster": "Cluster-02"},
+    {"name": "esxi-host-06", "esx_version": "VMware ESXi 8.0.2", "cpu_model": "Intel Xeon Platinum 8480+", "datacenter": "DC-Tertiary", "cluster": "Cluster-03"}
+]
+
+# USB devices - just VM names that have USB
+USB_VMS = [
+    {"vm": "vm-web-server-01", "device": "USB Controller", "connected": True},
+    {"vm": "vm-app-server-01", "device": "USB Mass Storage", "connected": True},
+    {"vm": "vm-db-oracle-01", "device": "USB Smart Card Reader", "connected": True},
+    {"vm": "vm-app-server-02", "device": "USB Printer", "connected": False},
+    {"vm": "vm-mixed-issues-01", "device": "USB Hub", "connected": True}
+]
+
+# Snapshots - just VM names that have snapshots
+SNAPSHOTS = [
+    {"vm": "vm-db-oracle-01", "name": "Pre-patch snapshot", "desc": "Created before monthly patching", "date": "2024-01-15 10:30:00", "size": 5120},
+    {"vm": "vm-db-oracle-02", "name": "Database backup point", "desc": "Before database schema upgrade", "date": "2024-01-20 14:15:00", "size": 8192},
+    {"vm": "vm-app-server-01", "name": "Before upgrade", "desc": "Before application upgrade", "date": "2024-01-25 02:00:00", "size": 2048},
+    {"vm": "vm-app-server-02", "name": "Performance baseline", "desc": "Baseline before performance tuning", "date": "2024-02-01 16:45:00", "size": 4096},
+    {"vm": "vm-web-server-01", "name": "Backup point", "desc": "Daily backup snapshot", "date": "2024-02-05 08:30:00", "size": 1024},
+    {"vm": "vm-web-server-02", "name": "Security update prep", "desc": "Before security patch installation", "date": "2024-02-10 12:15:00", "size": 3072},
+    {"vm": "vm-large-storage-01", "name": "Storage migration prep", "desc": "Before storage vMotion", "date": "2024-02-15 18:00:00", "size": 15360},
+    {"vm": "vm-mixed-issues-01", "name": "Multi-snapshot-vm", "desc": "Multiple snapshots for testing", "date": "2024-02-20 22:30:00", "size": 6144}
+]
+
+# CD-ROM devices - just VM names that have CD-ROMs
+CDROMS = [
+    {"vm": "vm-app-server-01", "connected": "True", "starts": "True", "iso": "[datastore1] iso/windows-server-2019.iso"},
+    {"vm": "vm-web-server-01", "connected": "False", "starts": "False", "iso": ""},
+    {"vm": "vm-db-oracle-01", "connected": "True", "starts": "True", "iso": "[datastore2] iso/oracle-linux-8.5.iso"},
+    {"vm": "vm-db-oracle-02", "connected": "True", "starts": "True", "iso": "[datastore1] iso/oracle-database-19c.iso"},
+    {"vm": "vm-mixed-issues-01", "connected": "True", "starts": "True", "iso": "[datastore3] iso/mixed-tools.iso"},
+    {"vm": "vm-baseline-good", "connected": "False", "starts": "False", "iso": ""}
+]
+
+# Standard switch VMs (risk)
+STANDARD_SWITCH_VMS = [
+    {"vm": "vm-standard-switch-01", "label": "VM Network", "switch": "vSwitch0"},
+    {"vm": "vm-standard-switch-02", "label": "Management Network", "switch": "vSwitch1"},
+    {"vm": "vm-standard-switch-03", "label": "Storage Network", "switch": "vSwitch2"},
+    {"vm": "vm-mixed-issues-01", "label": "Legacy-Network", "switch": "vSwitch0"}
+]
+
+# dvPort configurations
+DVPORTS = [
+    {"vm": "vm-web-server-01", "type": "earlyBinding", "vlan": 100, "promiscuous": "False", "mac": "False", "forge": "False"},
+    {"vm": "vm-db-oracle-01", "type": "earlyBinding", "vlan": None, "promiscuous": "True", "mac": "False", "forge": "True"},
+    {"vm": "vm-risky-port-01", "type": "ephemeral", "vlan": 200, "promiscuous": "False", "mac": "True", "forge": "False"},
+    {"vm": "vm-risky-port-02", "type": "ephemeral", "vlan": None, "promiscuous": "False", "mac": "False", "forge": "True"},
+    {"vm": "vm-app-server-01", "type": "earlyBinding", "vlan": 300, "promiscuous": "False", "mac": "False", "forge": "False"},
+    {"vm": "vm-security-risk-01", "type": "earlyBinding", "vlan": 400, "promiscuous": "True", "mac": "True", "forge": "True"},
+    {"vm": "vm-ephemeral-risk-01", "type": "ephemeral", "vlan": 500, "promiscuous": "False", "mac": "False", "forge": "False"},
+    {"vm": "vm-ephemeral-risk-02", "type": "ephemeral", "vlan": 600, "promiscuous": "False", "mac": "False", "forge": "False"},
+    {"vm": "vm-baseline-good", "type": "earlyBinding", "vlan": 700, "promiscuous": "False", "mac": "False", "forge": "False"}
+]
+
+# Shared disk groups
+SHARED_DISK_GROUPS = {
+    "cluster1": "[shared-datastore] cluster-shared-disk-01.vmdk",
+    "cluster2": "[shared-datastore] cluster-shared-disk-02.vmdk",
+    "multi_shared": "[shared-datastore] multi-shared-storage.vmdk"
+}
+
+# Default values for VMs
+VM_DEFAULTS = {
+    "powerstate": "poweredOn",
+    "guest_state": "running",
+    "os": "Microsoft Windows Server 2022",
+    "os_config": "Microsoft Windows Server 2022 (64-bit)",
+    "hw_version": 17,
+    "cpus": 4,
+    "memory": 8192,
+    "provisioned": 102400,
+    "datacenter": "DC-Primary",
+    "cluster": "Cluster-01",
+    "host": "esxi-host-01",
+    "capacity": 51200
+}
+
+
+# =============================================================================
+# SIMPLE SHEET BUILDERS - Minimal code, just data transformation
+# =============================================================================
+
+def build_vhost_sheet() -> pd.DataFrame:
+    """Build vHost sheet from host data."""
+    data = []
+    for host in HOSTS:
+        vm_count = len([vm for vm in VMS if vm.get("host", VM_DEFAULTS["host"]) == host["name"]])
+        data.append({
+            "Host": host["name"],
+            "ESX Version": host["esx_version"],
+            "CPU Model": host["cpu_model"],
+            "Datacenter": host["datacenter"],
+            "Cluster": host["cluster"],
+            "# VMs": vm_count
+        })
+    return pd.DataFrame(data)
+
+
+def build_vinfo_sheet() -> pd.DataFrame:
+    """Build vInfo sheet from VM data."""
+    data = []
+    for vm in VMS:
+        # Apply defaults and overrides
+        vm_data = {**VM_DEFAULTS, **vm}
+
+        # Calculate derived values
+        in_use = vm_data["provisioned"] // 2
+
+        data.append({
+            "VM": vm_data["name"],
+            "Powerstate": vm_data["powerstate"],
+            "Guest state": vm_data["guest_state"],
+            "OS according to the VMware Tools": vm_data["os"],
+            "OS according to the configuration file": vm_data["os_config"],
+            "HW version": vm_data["hw_version"],
+            "CPUs": vm_data["cpus"],
+            "Memory": vm_data["memory"],
+            "Provisioned MiB": vm_data["provisioned"],
+            "In Use MiB": in_use,
+            "Used MiB": in_use,
+            "Datacenter": vm_data["datacenter"],
+            "Cluster": vm_data["cluster"],
+            "Host": vm_data["host"]
+        })
+    return pd.DataFrame(data)
+
+
+def build_vdisk_sheet() -> pd.DataFrame:
+    """Build vDisk sheet from VM data."""
+    data = []
+    for vm in VMS:
+        vm_data = {**VM_DEFAULTS, **vm}
+
+        # Determine disk path
+        disk_path = f"[datastore1] {vm_data['name']}/{vm_data['name']}.vmdk"
+        if vm_data.get("shared_group"):
+            disk_path = SHARED_DISK_GROUPS[vm_data["shared_group"]]
+
+        # Determine sharing mode and shared bus
+        sharing_mode = "sharingNone"
+        shared_bus = "noSharing"
+        write_through = "False"
+
+        if vm_data.get("type") in ["shared_disk", "individual_shared"]:
+            sharing_mode = "sharingMultiWriter"
+            shared_bus = "physicalSharing"
+            if vm_data.get("shared_group") in ["cluster1", "cluster2"]:
+                write_through = "True"
+
+        data.append({
+            "VM": vm_data["name"],
+            "Powerstate": vm_data["powerstate"],
+            "Disk": "Hard disk 1",
+            "Capacity MiB": vm_data["capacity"],
+            "Raw": vm_data.get("disk_raw", False),
+            "Raw Com. Mode": vm_data.get("disk_raw_mode", ""),
+            "Disk Mode": vm_data.get("disk_mode", "persistent"),
+            "Path": disk_path,
+            "Sharing mode": sharing_mode,
+            "Write Through": write_through,
+            "Shared Bus": shared_bus
+        })
+    return pd.DataFrame(data)
+
+
+def build_vusb_sheet() -> pd.DataFrame:
+    """Build vUSB sheet from USB data."""
+    data = []
+    for i, usb in enumerate(USB_VMS):
+        data.append({
+            "VM": usb["vm"],
+            "Powerstate": "poweredOn",
+            "Device Type": usb["device"],
+            "Connected": usb["connected"],
+            "Path": f"/vmfs/devices/usb/{i+1:03d}/001"
+        })
+    return pd.DataFrame(data)
+
+
+def build_vsnapshot_sheet() -> pd.DataFrame:
+    """Build vSnapshot sheet from snapshot data."""
+    data = []
+    for snap in SNAPSHOTS:
+        data.append({
+            "VM": snap["vm"],
+            "Powerstate": "poweredOn",
+            "Name": snap["name"],
+            "Description": snap["desc"],
+            "Date / time": snap["date"],
+            "Size MiB (vmsn)": snap["size"]
+        })
+    return pd.DataFrame(data)
+
+
+def build_vcd_sheet() -> pd.DataFrame:
+    """Build vCD sheet from CD-ROM data."""
+    data = []
+    for cd in CDROMS:
+        data.append({
+            "VM": cd["vm"],
+            "Powerstate": "poweredOn",
+            "Connected": cd["connected"],
+            "Starts Connected": cd["starts"],
+            "ISO Path": cd["iso"],
+            "Device Type": "CD/DVD drive"
+        })
+    return pd.DataFrame(data)
+
+
+def build_vnetwork_sheet() -> pd.DataFrame:
+    """Build vNetwork sheet from network data."""
+    data = []
+
+    # Add standard switch VMs (risks)
+    for net in STANDARD_SWITCH_VMS:
+        data.append({
+            "VM": net["vm"],
+            "Network Label": net["label"],
+            "Switch": net["switch"],
+            "Connected": True,
+            "Status": "Connected"
+        })
+
+    # Add some DVS VMs (good)
+    dvs_vms = ["vm-web-server-01", "vm-web-server-02", "vm-db-oracle-01", "vm-app-server-01", "vm-baseline-good"]
+    for i, vm in enumerate(dvs_vms):
+        data.append({
+            "VM": vm,
+            "Network Label": f"Production-VLAN-{100 + i * 100}",
+            "Switch": f"dvSwitch-{(i % 2) + 1:02d}",
+            "Connected": True,
+            "Status": "Connected"
+        })
+
+    return pd.DataFrame(data)
+
+
+def build_dvport_sheet() -> pd.DataFrame:
+    """Build dvPort sheet from dvPort data."""
+    data = []
+    for i, port in enumerate(DVPORTS):
+        data.append({
+            "VM": port["vm"],
+            "Port": str(50000001 + i),
+            "Switch": "dvSwitch-01",
+            "Object ID": str(1001 + i),
+            "Type": port["type"],
+            "VLAN": port["vlan"],
+            "Allow Promiscuous": port["promiscuous"],
+            "Mac Changes": port["mac"],
+            "Forged Transmits": port["forge"],
+            "Connected": i != 2,  # One disconnected
+            "Status": "Connected" if i != 2 else "Disconnected"
+        })
+    return pd.DataFrame(data)
+
+
+def build_dvswitch_sheet() -> pd.DataFrame:
+    """Build dvSwitch sheet."""
+    return pd.DataFrame([
+        {"Switch": "dvSwitch-01", "Name": "dvSwitch-01", "Type": "Distributed Virtual Switch", "Version": "7.0.3", "Datacenter": "DC-Primary"},
+        {"Switch": "dvSwitch-02", "Name": "dvSwitch-02", "Type": "Distributed Virtual Switch", "Version": "8.0.1", "Datacenter": "DC-Secondary"}
+    ])
+
+
+# =============================================================================
+# MAIN FUNCTION - Just orchestration
+# =============================================================================
+
+def create_comprehensive_test_data(output_path: Optional[Path] = None) -> Path:
+    """Create comprehensive test data from the data definitions above."""
+
+    print("🔄 Building test data from data definitions...")
+
+    # Build all sheets
+    sheets = {
+        "vHost": build_vhost_sheet(),
+        "vInfo": build_vinfo_sheet(),
+        "vDisk": build_vdisk_sheet(),
+        "vUSB": build_vusb_sheet(),
+        "vSnapshot": build_vsnapshot_sheet(),
+        "vCD": build_vcd_sheet(),
+        "vNetwork": build_vnetwork_sheet(),
+        "dvPort": build_dvport_sheet(),
+        "dvSwitch": build_dvswitch_sheet()
+    }
+
+    # Create output path
+    if output_path is None:
+        output_path = Path(__file__).parent / 'test-data' / 'comprehensive_test_data.xlsx'
+
+    # Write to Excel
     with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
-        for sheet_name, df in sheets_data.items():
+        for sheet_name, df in sheets.items():
             df.to_excel(writer, sheet_name=sheet_name, index=False)
 
-    print(f"✅ Created comprehensive test data file: {output_path}")
-    print(f"📊 Created {len(sheets_data)} sheets with expanded data for better test coverage:")
-    for sheet_name, df in sheets_data.items():
+    print(f"✅ Created test data file: {output_path}")
+    print(f"📊 Created {len(sheets)} sheets:")
+    for sheet_name, df in sheets.items():
         print(f"   - {sheet_name}: {len(df)} rows")
 
-    print("\n🎯 All 15 risk functions should be triggered with multiple instances:")
-    risk_functions = [
-        "detect_esx_versions (vHost - multiple old ESX versions)",
-        "detect_vusb_devices (vUSB - different USB device types)",
-        "detect_risky_disks (vDisk - raw/independent disks across VMs)",
-        "detect_non_dvs_switches (vNetwork - standard vSwitches)",
-        "detect_snapshots (vSnapshot - snapshots across VMs)",
-        "detect_suspended_vms (vInfo - suspended VMs)",
-        "detect_oracle_vms (vInfo - Oracle VMs)",
-        "detect_dvport_issues (dvPort - multiple security issues)",
-        "detect_non_intel_hosts (vHost - AMD hosts)",
-        "detect_vmtools_not_running (vInfo - VMs with tools issues)",
-        "detect_cdrom_issues (vCD - VMs with connected CD-ROMs)",
-        "detect_large_provisioned_vms (vInfo - VMs >10TB)",
-        "detect_high_vcpu_vms (vInfo - VMs with high CPU count)",
-        "detect_high_memory_vms (vInfo - VMs with high memory)",
-        "detect_hw_version_compatibility (vInfo - VMs with old HW versions)"
-    ]
-    for i, risk in enumerate(risk_functions, 1):
-        print(f"   {i:2d}. {risk}")
     return output_path
+
 
 if __name__ == "__main__":
     create_comprehensive_test_data()
