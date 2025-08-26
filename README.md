@@ -24,6 +24,7 @@ A unified FastAPI application for analyzing RVTools data with both web interface
   - VM Hardware version compatibility (blocking)
   - Shared disks (blocking)
   - Clear text passwords (emergency)
+  - VMkernel networks (warning)
 
 ## AI integration disclaimer
 
@@ -72,11 +73,11 @@ cd avs-rvtools-analyzer
 
 # Install dependencies and run in development mode
 uv sync --extra dev
-uv run avs-rvtools-analyzer
+uv run avs-rvtools-analyzer --reload --debug
 
 # Or activate the virtual environment
 uv shell
-avs-rvtools-analyzer
+avs-rvtools-analyzer --reload --debug
 ```
 
 ### Traditional Installation Methods
@@ -118,7 +119,7 @@ pip install .
 uv sync --extra dev
 
 # Run in development mode
-uv run avs-rvtools-analyzer --host 127.0.0.1 --port 8000
+uv run avs-rvtools-analyzer --host 127.0.0.1 --port 8000 --reload --debug
 ```
 
 ### Testing

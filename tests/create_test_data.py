@@ -69,6 +69,12 @@ VMS = [
     {"name": "vm-password-exposed-02", "type": "web", "annotation": "Service account pwd: ServicePass456"},
     {"name": "vm-password-exposed-03", "type": "web", "annotation": "Contains secret key and credentials for DB access"},
     {"name": "vm-clean-annotation", "type": "web", "annotation": "Regular server configuration notes"},
+
+    # VMkernel network VMs (warning risk - VMs connected to management networks)
+    {"name": "vm-vmkernel-mgmt-01", "type": "vmkernel_risk", "vmkernel_network": "vMotion-Network"},
+    {"name": "vm-vmkernel-mgmt-02", "type": "vmkernel_risk", "vmkernel_network": "Management-Network"},
+    {"name": "vm-vmkernel-storage-01", "type": "vmkernel_risk", "vmkernel_network": "Storage-Network"},
+
     {"name": "vm-app-server-01", "type": "app", "os": "Ubuntu Linux 20.04"},
     {"name": "vm-app-server-02", "type": "app", "os": "Ubuntu Linux 22.04"},
 
@@ -143,6 +149,18 @@ DVPORTS = [
     {"vm": "vm-ephemeral-risk-01", "type": "ephemeral", "vlan": 500, "promiscuous": "False", "mac": "False", "forge": "False"},
     {"vm": "vm-ephemeral-risk-02", "type": "ephemeral", "vlan": 600, "promiscuous": "False", "mac": "False", "forge": "False"},
     {"vm": "vm-baseline-good", "type": "earlyBinding", "vlan": 700, "promiscuous": "False", "mac": "False", "forge": "False"}
+]
+
+# VMkernel network interfaces (for ESXi management traffic)
+VMKERNEL_INTERFACES = [
+    {"host": "esxi-host-01", "device": "vmk0", "network": "Management-Network", "ip": "192.168.10.101", "netmask": "255.255.255.0", "mtu": 1500, "services": "Management"},
+    {"host": "esxi-host-01", "device": "vmk1", "network": "vMotion-Network", "ip": "192.168.20.101", "netmask": "255.255.255.0", "mtu": 9000, "services": "vMotion"},
+    {"host": "esxi-host-01", "device": "vmk2", "network": "Storage-Network", "ip": "192.168.30.101", "netmask": "255.255.255.0", "mtu": 9000, "services": ""},
+    {"host": "esxi-host-02", "device": "vmk0", "network": "Management-Network", "ip": "192.168.10.102", "netmask": "255.255.255.0", "mtu": 1500, "services": "Management"},
+    {"host": "esxi-host-02", "device": "vmk1", "network": "vMotion-Network", "ip": "192.168.20.102", "netmask": "255.255.255.0", "mtu": 9000, "services": "vMotion"},
+    {"host": "esxi-host-02", "device": "vmk2", "network": "Storage-Network", "ip": "192.168.30.102", "netmask": "255.255.255.0", "mtu": 9000, "services": ""},
+    {"host": "esxi-host-03", "device": "vmk0", "network": "Management-Network", "ip": "192.168.10.103", "netmask": "255.255.255.0", "mtu": 1500, "services": "Management"},
+    {"host": "esxi-host-03", "device": "vmk1", "network": "vMotion-Network", "ip": "192.168.20.103", "netmask": "255.255.255.0", "mtu": 9000, "services": "vMotion"}
 ]
 
 # Shared disk groups
@@ -309,21 +327,67 @@ def build_vnetwork_sheet() -> pd.DataFrame:
     for net in STANDARD_SWITCH_VMS:
         data.append({
             "VM": net["vm"],
-            "Network Label": net["label"],
+            "Powerstate": "poweredOn",
+            "Network": net["label"],  # Using Network column as specified
             "Switch": net["switch"],
             "Connected": True,
-            "Status": "Connected"
+            "Status": True,
+            "Starts Connected": True,
+            "IPv4 Address": "192.168.1.100",
+            "Mac Address": "00:50:56:a6:27:ad"
         })
 
     # Add some DVS VMs (good)
     dvs_vms = ["vm-web-server-01", "vm-web-server-02", "vm-db-oracle-01", "vm-app-server-01", "vm-baseline-good"]
     for i, vm in enumerate(dvs_vms):
+        network_label = f"Production-VLAN-{100 + i * 100}"
         data.append({
             "VM": vm,
-            "Network Label": f"Production-VLAN-{100 + i * 100}",
+            "Powerstate": "poweredOn",
+            "Network": network_label,  # Using Network column as specified
             "Switch": f"dvSwitch-{(i % 2) + 1:02d}",
             "Connected": True,
-            "Status": "Connected"
+            "Starts Connected": True,
+            "IPv4 Address": "192.168.1.100",
+            "Mac Address": "00:50:56:a6:27:ad"
+        })
+
+    # Add VMs connected to VMkernel networks (WARNING RISK!)
+    vmkernel_vms = [
+        {"vm": "vm-vmkernel-mgmt-01", "network": "Management-Network"},
+        {"vm": "vm-vmkernel-mgmt-02", "network": "Management-Network"},
+        {"vm": "vm-vmkernel-storage-01", "network": "Storage-Network"}
+    ]
+
+    for vm_data in vmkernel_vms:
+        data.append({
+            "VM": vm_data["vm"],
+            "Powerstate": "poweredOn",
+            "Network": vm_data["network"],  # This will match VMkernel networks!
+            "Switch": "vSwitch0",  # VMkernel networks typically on standard switches
+            "Connected": True,
+            "Starts Connected": True,
+            "IPv4 Address": "192.168.1.100",
+            "Mac Address": "00:50:56:a6:27:ad"
+        })
+
+    return pd.DataFrame(data)
+
+
+def build_vsc_vmk_sheet() -> pd.DataFrame:
+    """Build vSC_VMK sheet (VMkernel network interfaces) from VMkernel data."""
+    data = []
+
+    for vmk in VMKERNEL_INTERFACES:
+        data.append({
+            "Host": vmk["host"],
+            "Device": vmk["device"],
+            "Port Group": vmk["network"],  # This is the key column for detection
+            "IP Address": vmk["ip"],
+            "Subnet mask": vmk["netmask"],
+            "MTU": vmk["mtu"],
+            "Datacenter": "DC-Primary",
+            "Cluster": "Cluster-01"
         })
 
     return pd.DataFrame(data)
@@ -375,6 +439,7 @@ def create_comprehensive_test_data(output_path: Optional[Path] = None) -> Path:
         "vSnapshot": build_vsnapshot_sheet(),
         "vCD": build_vcd_sheet(),
         "vNetwork": build_vnetwork_sheet(),
+        "vSC_VMK": build_vsc_vmk_sheet(),
         "dvPort": build_dvport_sheet(),
         "dvSwitch": build_dvswitch_sheet()
     }

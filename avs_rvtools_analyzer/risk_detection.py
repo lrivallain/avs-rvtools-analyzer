@@ -789,6 +789,69 @@ def detect_clear_text_passwords(excel_data: pd.ExcelFile) -> Dict[str, Any]:
     return {'count': len(password_exposures), 'data': password_exposures}
 
 
+@risk_info(
+    level=RiskLevel.WARNING,
+    description='VMs connected to ESXi VMkernel networks instead of standard VM networks.',
+    alert_message="""VMkernel networks are designed for ESXi management traffic (vMotion, storage, management, etc.)
+    and should not be used for virtual machine network connectivity.<br><br>VMkernel networks cannot be extended with
+    HCX.
+    <br><br>It's recommended to move these VMs to dedicated VM networks before migration."""
+)
+def detect_vmkernel_network_vms(excel_data: pd.ExcelFile) -> Dict[str, Any]:
+    """
+    Detect VMs connected to ESXi VMkernel networks.
+
+    VMkernel networks are intended for ESXi host management traffic like vMotion,
+    storage, and management. VMs should not be connected to these networks as it
+    can cause network conflicts and operational issues.
+
+    Args:
+        excel_data: Parsed Excel file from RVTools
+
+    Returns:
+        Dictionary with count and data about VMs on VMkernel networks
+    """
+    vmkernel_vms = []
+
+    # First, get all VMkernel networks from vSC_VMK sheet
+    vmk_data = safe_sheet_access(excel_data, 'vSC_VMK')
+    vmkernel_networks = set()
+
+    if not vmk_data.empty and 'Port Group' in vmk_data.columns:
+        # Get all unique network names from VMkernel interfaces
+        vmkernel_networks = set(vmk_data['Port Group'].dropna().unique())
+        logger.debug(f"Found {len(vmkernel_networks)} VMkernel networks: {vmkernel_networks}")
+
+    if not vmkernel_networks:
+        logger.info("detect_vmkernel_network_vms: No VMkernel networks found")
+        return {'count': 0, 'data': []}
+
+    # Now check vNetwork sheet for VMs connected to these networks
+    vnetwork_data = safe_sheet_access(excel_data, 'vNetwork')
+
+    if vnetwork_data.empty or 'Network' not in vnetwork_data.columns:
+        logger.warning("detect_vmkernel_network_vms: No vNetwork sheet or Network column found")
+        return {'count': 0, 'data': []}
+
+    # Find VMs connected to VMkernel networks
+    for _, row in vnetwork_data.iterrows():
+        network_name = row.get('Network', '')
+        vm_name = row.get('VM', 'Unknown')
+
+        if network_name in vmkernel_networks:
+            vmkernel_vms.append({
+                'VM': vm_name,
+                'Powerstate': row.get('Powerstate', ''),
+                'Network': network_name,
+                'Switch': row.get('Switch', ''),
+                'Connected': row.get('Connected', ''),
+                'IPv4 Address': row.get('IPv4 Address', '')
+            })
+
+    logger.info(f"detect_vmkernel_network_vms: Found {len(vmkernel_vms)} VMs connected to VMkernel networks")
+    return {'count': len(vmkernel_vms), 'data': vmkernel_vms}
+
+
 ########################################################################################################################
 #                                                                                                                      #
 #                                         End of Risk Detection Functions                                              #
@@ -821,6 +884,7 @@ def get_risk_functions_list() -> List:
         detect_hw_version_compatibility,
         detect_shared_disks,
         detect_clear_text_passwords,
+        detect_vmkernel_network_vms,
     ]
 
 def get_total_risk_functions_count() -> int:

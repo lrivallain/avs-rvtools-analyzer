@@ -36,3 +36,8 @@ dev = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["avs_rvtools_analyzer"]
+
+[dependency-groups]
+dev = [
+    "pytest-watch>=4.2.0",
+]

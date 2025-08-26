@@ -29,6 +29,7 @@ from avs_rvtools_analyzer.risk_detection import (
     detect_hw_version_compatibility,
     detect_shared_disks,
     detect_clear_text_passwords,
+    detect_vmkernel_network_vms,
 )
 
 
@@ -704,3 +705,152 @@ class TestDetectClearTextPasswords:
         result = detect_clear_text_passwords(excel_data)
 
         assert result['count'] == 3, f"Should detect passwords regardless of case, got {result['count']}"
+
+
+class TestDetectVMkernelNetworkVMs:
+    """Test cases for VMkernel network VM detection."""
+
+    def test_detect_vmkernel_vms_finds_management_network_vms(self):
+        """Test detection of VMs connected to VMkernel management networks."""
+        class MockExcelData:
+            sheet_names = ['vSC_VMK', 'vNetwork']
+
+            def parse(self, sheet_name):
+                if sheet_name == 'vSC_VMK':
+                    return pd.DataFrame({
+                        'Host': ['esxi-host-01', 'esxi-host-01', 'esxi-host-02'],
+                        'Device': ['vmk0', 'vmk1', 'vmk0'],
+                        'Port Group': ['Management-Network', 'vMotion-Network', 'Management-Network'],
+                        'IP Address': ['192.168.10.101', '192.168.20.101', '192.168.10.102'],
+                        'Services': ['Management', 'vMotion', 'Management']
+                    })
+                elif sheet_name == 'vNetwork':
+                    return pd.DataFrame({
+                        'VM': ['VM1', 'VM2', 'VM3', 'VM4'],
+                        'Powerstate': ['poweredOn', 'poweredOn', 'poweredOff', 'poweredOff'],
+                        'Network': ['Management-Network', 'vMotion-Network', 'Production-VLAN-100', 'Storage-Network'],
+                        'Connected': [True, True, True, True],
+                        'Starts Connected': [True, True, True, True],
+                        'IPv4 Address': ['192.168.1.100', '192.168.1.101', '192.168.1.102', '192.168.1.103'],
+                        'Mac Address': ['00:50:56:a6:27:ad', '00:50:56:a6:27:ae', '00:50:56:a6:27:af', '00:50:56:a6:27:b0']
+                    })
+                return pd.DataFrame()
+
+        excel_data = MockExcelData()
+        result = detect_vmkernel_network_vms(excel_data)
+
+        assert result['count'] == 2, f"Should detect 2 VMs on VMkernel networks, got {result['count']}"
+        assert len(result['data']) == 2, f"Should return data for 2 VMs, got {len(result['data'])}"
+
+        # Check that the correct VMs were detected
+        detected_vms = [vm['VM'] for vm in result['data']]
+        assert 'VM1' in detected_vms, "Should detect VM1 on Management-Network"
+        assert 'VM2' in detected_vms, "Should detect VM2 on vMotion-Network"
+        assert 'VM3' not in detected_vms, "Should not detect VM3 on Production network"
+
+    def test_detect_vmkernel_vms_details(self):
+        """Test that detection provides proper details about VMkernel network VMs."""
+        class MockExcelData:
+            sheet_names = ['vSC_VMK', 'vNetwork']
+
+            def parse(self, sheet_name):
+                if sheet_name == 'vSC_VMK':
+                    return pd.DataFrame({
+                        'Port Group': ['Storage-Network']
+                    })
+                elif sheet_name == 'vNetwork':
+                    return pd.DataFrame({
+                        'VM': ['VM-Storage-Risk'],
+                        'Powerstate': ['poweredOn'],
+                        'Network': ['Storage-Network'],
+                        'Switch': ['vSwitch-01'],
+                        'Connected': [True],
+                        'Start Connected': [True],
+                        'IPv4 Address': ['192.168.1.100'],
+                        'Mac Address': ['00:50:56:a6:27:ad']
+                    })
+                return pd.DataFrame()
+
+        excel_data = MockExcelData()
+        result = detect_vmkernel_network_vms(excel_data)
+
+        assert result['count'] == 1, "Should detect 1 VM on Storage-Network"
+
+        vm_data = result['data'][0]
+        assert vm_data['VM'] == 'VM-Storage-Risk'
+        assert vm_data['Network'] == 'Storage-Network'
+        assert 'Network' in vm_data
+
+    def test_no_vmkernel_networks_found(self):
+        """Test when no VMkernel networks are found."""
+        class MockExcelData:
+            sheet_names = ['vSC_VMK', 'vNetwork']
+
+            def parse(self, sheet_name):
+                return pd.DataFrame()  # Empty sheets
+
+        excel_data = MockExcelData()
+        result = detect_vmkernel_network_vms(excel_data)
+
+        assert result['count'] == 0, "Should detect no VMkernel network VMs"
+        assert result['data'] == [], "Should return empty data list"
+
+    def test_missing_vsc_vmk_sheet(self):
+        """Test behavior when vSC_VMK sheet is missing."""
+        class MockExcelData:
+            sheet_names = ['vNetwork']
+
+            def parse(self, sheet_name):
+                if sheet_name == 'vNetwork':
+                    return pd.DataFrame({
+                        'VM': ['VM1'],
+                        'Network': ['Some-Network']
+                    })
+                return pd.DataFrame()
+
+        excel_data = MockExcelData()
+        result = detect_vmkernel_network_vms(excel_data)
+
+        assert result['count'] == 0, "Should handle missing vSC_VMK sheet gracefully"
+        assert result['data'] == [], "Should return empty data"
+
+    def test_missing_vnetwork_sheet(self):
+        """Test behavior when vNetwork sheet is missing."""
+        class MockExcelData:
+            sheet_names = ['vSC_VMK']
+
+            def parse(self, sheet_name):
+                if sheet_name == 'vSC_VMK':
+                    return pd.DataFrame({
+                        'Network': ['Management-Network']
+                    })
+                return pd.DataFrame()
+
+        excel_data = MockExcelData()
+        result = detect_vmkernel_network_vms(excel_data)
+
+        assert result['count'] == 0, "Should handle missing vNetwork sheet gracefully"
+        assert result['data'] == [], "Should return empty data"
+
+    def test_no_matching_networks(self):
+        """Test when VMs are not connected to any VMkernel networks."""
+        class MockExcelData:
+            sheet_names = ['vSC_VMK', 'vNetwork']
+
+            def parse(self, sheet_name):
+                if sheet_name == 'vSC_VMK':
+                    return pd.DataFrame({
+                        'Network': ['Management-Network', 'vMotion-Network']
+                    })
+                elif sheet_name == 'vNetwork':
+                    return pd.DataFrame({
+                        'VM': ['VM1', 'VM2'],
+                        'Network': ['Production-VLAN-100', 'Test-Network']
+                    })
+                return pd.DataFrame()
+
+        excel_data = MockExcelData()
+        result = detect_vmkernel_network_vms(excel_data)
+
+        assert result['count'] == 0, "Should detect no VMs on VMkernel networks"
+        assert result['data'] == [], "Should return empty data list"
