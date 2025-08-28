@@ -28,15 +28,13 @@ jobs:
 
     - name: Run tests with coverage
       run: |
-        uv run pytest --cov=avs_rvtools_analyzer --cov-report=xml
+        uv run pytest --cov=avs_rvtools_analyzer --cov-report=html
 
-    - name: Upload coverage to Codecov (optional)
-      uses: codecov/codecov-action@v4
-      if: always()
+    - name: Save coverage report as artifact
+      uses: actions/upload-artifact@v3
       with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-        file: ./coverage.xml
-        fail_ci_if_error: false
+        name: htmlcov
+        path: htmlcov
 
     - name: Check code formatting (optional)
       run: |
