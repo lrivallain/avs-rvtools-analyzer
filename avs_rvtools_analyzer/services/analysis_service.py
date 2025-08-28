@@ -1,13 +1,14 @@
 """
 Analysis service for RVTools data processing.
 """
-from typing import Dict, Any
+import logging
+from typing import Any, Dict
+
 import numpy as np
 import pandas as pd
-import logging
 
-from ..risk_detection import gather_all_risks, get_available_risks
 from ..core.exceptions import AnalysisError, InsufficientDataError
+from ..risk_detection import gather_all_risks, get_available_risks
 
 logger = logging.getLogger(__name__)
 

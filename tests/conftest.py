@@ -3,10 +3,11 @@
 Test configuration and shared fixtures.
 """
 
-import pytest
-import pandas as pd
-from pathlib import Path
 import sys
+from pathlib import Path
+
+import pandas as pd
+import pytest
 
 # Add the project root to the Python path
 project_root = Path(__file__).parent.parent

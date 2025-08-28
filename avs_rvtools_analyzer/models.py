@@ -1,10 +1,11 @@
 """
 Data models and constants for RVTools risk detection.
 """
-from typing import Dict, List, Any, Optional, Union
-from pydantic import BaseModel, Field, ConfigDict
-from enum import Enum
 from datetime import datetime
+from enum import Enum
+from typing import Any, Dict, List, Optional, Union
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class RiskLevel(str, Enum):

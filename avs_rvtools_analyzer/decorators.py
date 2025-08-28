@@ -2,7 +2,8 @@
 Decorators for RVTools risk detection functions.
 """
 from functools import wraps
-from typing import Dict, Any, Callable, Union
+from typing import Any, Callable, Dict, Union
+
 from .models import RiskLevel
 
 

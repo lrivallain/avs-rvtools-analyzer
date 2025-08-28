@@ -4,10 +4,10 @@ Simple data-driven test data generator for AVS RVTools Analyzer.
 Uses pure data definitions with minimal code.
 """
 
-import pandas as pd
 from pathlib import Path
 from typing import Optional
 
+import pandas as pd
 
 # =============================================================================
 # DATA DEFINITIONS - Just modify these to change test data

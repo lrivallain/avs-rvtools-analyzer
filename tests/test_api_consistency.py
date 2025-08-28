@@ -6,10 +6,7 @@ Tests API endpoints and data structure consistency.
 """
 
 from avs_rvtools_analyzer.risk_detection import (
-    gather_all_risks,
-    get_total_risk_functions_count,
-    get_risk_functions_list
-)
+    gather_all_risks, get_risk_functions_list, get_total_risk_functions_count)
 
 
 class TestAPIDataStructureConsistency:

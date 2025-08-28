@@ -4,38 +4,34 @@ Exposes RVTools analysis capabilities through Model Context Protocol and web int
 """
 import asyncio
 import json
-import tempfile
+import logging
 import os
-from pathlib import Path
-from typing import Any, Dict, List
+import tempfile
 from contextlib import asynccontextmanager
-import numpy as np
-import xlrd
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
+import numpy as np
 import pandas as pd
-from fastapi import FastAPI, HTTPException, File, UploadFile, Form, Request
-from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
+import xlrd
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.middleware.cors import CORSMiddleware
 from fastmcp import FastMCP
 from pydantic import BaseModel
-from typing import Optional
-import logging
 
-from .risk_detection import gather_all_risks, get_available_risks
-from .helpers import load_sku_data
-from .utils import (
-    convert_mib_to_human_readable,
-    allowed_file,
-    get_risk_badge_class,
-    get_risk_display_name,
-    ColoredFormatter)
-from .config import AppConfig
-from .routes.web_routes import setup_web_routes
-from .routes.api_routes import setup_api_routes
-from .core.error_handlers import setup_error_handlers
 from . import __version__ as calver_version
+from .config import AppConfig
+from .core.error_handlers import setup_error_handlers
+from .helpers import load_sku_data
+from .risk_detection import gather_all_risks, get_available_risks
+from .routes.api_routes import setup_api_routes
+from .routes.web_routes import setup_web_routes
+from .utils import (ColoredFormatter, allowed_file,
+                    convert_mib_to_human_readable, get_risk_badge_class,
+                    get_risk_display_name)
 
 
 def setup_logging(debug: bool = False):

@@ -6,7 +6,9 @@ Tests global app behavior and risk gathering functionality.
 """
 
 import pytest
-from avs_rvtools_analyzer.risk_detection import gather_all_risks, get_total_risk_functions_count
+
+from avs_rvtools_analyzer.risk_detection import (
+    gather_all_risks, get_total_risk_functions_count)
 
 
 class TestRiskGatheringIntegration:

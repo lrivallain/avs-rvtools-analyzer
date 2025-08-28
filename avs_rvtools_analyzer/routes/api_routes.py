@@ -2,31 +2,22 @@
 API and MCP routes for AVS RVTools Analyzer.
 Combines both REST API endpoints and MCP tool definitions.
 """
-from typing import Any, Dict, List
+from datetime import UTC, datetime
 from pathlib import Path
-from datetime import datetime, UTC
+from typing import Any, Dict, List, Optional
 
-from fastapi import FastAPI, HTTPException, File, UploadFile, Form
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastmcp import FastMCP
 from pydantic import BaseModel, Field
-from typing import Optional
 
-from ..services import FileService, AnalysisService, SKUService
-from ..config import AppConfig
-from ..models import (
-    HealthResponse,
-    APIInfoResponse,
-    AnalysisResponse,
-    AvailableRisksResponse,
-    SKUCapabilitiesResponse,
-    RiskTypeInfo,
-    SKUInfo,
-    ErrorResponse,
-    ExcelToJsonResponse,
-    ExcelSheetInfo
-)
-from ..helpers import clean_value_for_json
 from .. import __version__ as calver_version
+from ..config import AppConfig
+from ..helpers import clean_value_for_json
+from ..models import (AnalysisResponse, APIInfoResponse,
+                      AvailableRisksResponse, ErrorResponse, ExcelSheetInfo,
+                      ExcelToJsonResponse, HealthResponse, RiskTypeInfo,
+                      SKUCapabilitiesResponse, SKUInfo)
+from ..services import AnalysisService, FileService, SKUService
 
 
 class AnalyzeFileRequest(BaseModel):

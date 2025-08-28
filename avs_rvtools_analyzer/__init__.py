@@ -2,6 +2,7 @@
 import tomllib
 from pathlib import Path
 
+
 def _get_version():
     """Read version from pyproject.toml file."""
     try:

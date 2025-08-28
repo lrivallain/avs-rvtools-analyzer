@@ -5,33 +5,22 @@ Individual Risk Detection Tests
 Tests each risk detection function independently to ensure proper functionality.
 """
 
-import pytest
-import pandas as pd
 import tempfile
 from pathlib import Path
 
+import pandas as pd
+import pytest
+
 # Import all risk detection functions
 from avs_rvtools_analyzer.risk_detection import (
-    detect_esx_versions,
-    detect_vusb_devices,
-    detect_risky_disks,
-    detect_non_dvs_switches,
-    detect_snapshots,
-    detect_suspended_vms,
-    detect_oracle_vms,
-    detect_dvport_issues,
-    detect_non_intel_hosts,
-    detect_vmtools_not_running,
-    detect_cdrom_issues,
-    detect_large_provisioned_vms,
-    detect_high_vcpu_vms,
-    detect_high_memory_vms,
-    detect_hw_version_compatibility,
-    detect_shared_disks,
-    detect_clear_text_passwords,
-    detect_vmkernel_network_vms,
-    detect_fault_tolerance_vms,
-)
+    detect_cdrom_issues, detect_clear_text_passwords, detect_dvport_issues,
+    detect_esx_versions, detect_fault_tolerance_vms, detect_high_memory_vms,
+    detect_high_vcpu_vms, detect_hw_version_compatibility,
+    detect_large_provisioned_vms, detect_non_dvs_switches,
+    detect_non_intel_hosts, detect_oracle_vms, detect_risky_disks,
+    detect_shared_disks, detect_snapshots, detect_suspended_vms,
+    detect_vmkernel_network_vms, detect_vmtools_not_running,
+    detect_vusb_devices)
 
 
 class TestESXVersionRiskDetection:

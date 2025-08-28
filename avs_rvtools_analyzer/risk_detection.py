@@ -2,22 +2,22 @@
 Risk detection module for RVTools analysis.
 Contains individual risk detection functions and a gatherer function.
 """
+import logging
 import re
-from typing import Dict, List, Any
+from typing import Any, Dict, List
+
 import pandas as pd
 
-# Import from our new modules
-from .models import RiskLevel, ESXVersionThresholds, PowerStates, GuestStates, NetworkConstants, StorageConstants
 from .config import MigrationMethodsConfig
-from .helpers import (
-    load_sku_data, safe_sheet_access, create_empty_result,
-    filter_dataframe_by_condition, get_risk_category, convert_mib_to_tb,
-    clean_function_name_for_display
-)
-from .utils import contains_password_reference, redact_password_content
 from .decorators import risk_info
+from .helpers import (clean_function_name_for_display, convert_mib_to_tb,
+                      create_empty_result, filter_dataframe_by_condition,
+                      get_risk_category, load_sku_data, safe_sheet_access)
+# Import from our new modules
+from .models import (ESXVersionThresholds, GuestStates, NetworkConstants,
+                     PowerStates, RiskLevel, StorageConstants)
+from .utils import contains_password_reference, redact_password_content
 
-import logging
 logger = logging.getLogger(__name__)
 
 ########################################################################################################################

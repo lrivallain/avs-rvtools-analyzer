@@ -4,13 +4,13 @@ Web UI routes for AVS RVTools Analyzer.
 import json
 from typing import Any
 
-from fastapi import FastAPI, File, UploadFile, Request
+from fastapi import FastAPI, File, Request, UploadFile
 from fastapi.responses import HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
 
-from ..services import FileService, AnalysisService
 from ..config import AppConfig
 from ..helpers import clean_value_for_json, json_serializer
+from ..services import AnalysisService, FileService
 
 
 def setup_web_routes(
