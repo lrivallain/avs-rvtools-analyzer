@@ -50,7 +50,7 @@ jobs:
 
     - name: Lint code (optional)
       run: |
-        uv run flake8 .
+        uv run flake8 --extend-exclude .venv,dist .
       continue-on-error: true
 
   pr-title-check:
