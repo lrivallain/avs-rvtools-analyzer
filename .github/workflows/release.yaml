@@ -1,0 +1,113 @@
+# Deploy on version tags only
+name: Release and Deploy
+
+on:
+  push:
+    tags: ["20*.*.*"]
+
+jobs:
+  test:
+    name: Run tests
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+
+    - name: Install dependencies and run tests
+      run: |
+        uv sync --extra dev
+        uv run pytest
+
+  publish:
+    name: Publish to PyPI
+    runs-on: ubuntu-latest
+    needs: [test]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Verify tag matches version
+        run: |
+          PACKAGE_VERSION=$(uv run python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
+          GIT_TAG=${GITHUB_REF#refs/tags/}
+          if [ "$PACKAGE_VERSION" != "$GIT_TAG" ]; then
+            echo "Package version ($PACKAGE_VERSION) does not match git tag ($GIT_TAG)"
+            exit 1
+          fi
+
+      - name: Build and publish package
+        env:
+          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_PASSWORD }}
+        run: |
+          uv build
+          uv publish
+
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [test]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch full history for changelog generation
+
+      - name: Get previous tag
+        id: prev-tag
+        run: |
+          PREV_TAG=$(git tag --sort=-version:refname | grep -E "^20[0-9]{2}\.[0-9]+\.[0-9]+$" | sed -n '2p')
+          echo "prev-tag=${PREV_TAG}" >> $GITHUB_OUTPUT
+          echo "Previous tag: ${PREV_TAG}"
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          CURRENT_TAG=${GITHUB_REF#refs/tags/}
+          PREV_TAG="${{ steps.prev-tag.outputs.prev-tag }}"
+          
+          echo "## What's Changed" > changelog.md
+          echo "" >> changelog.md
+          
+          if [ -n "$PREV_TAG" ]; then
+            # Get commits between tags
+            git log --oneline --no-merges "${PREV_TAG}..${CURRENT_TAG}" | while read line; do
+              echo "- $line" >> changelog.md
+            done
+            
+            # Get merged PRs (if any)
+            echo "" >> changelog.md
+            echo "### Merged Pull Requests" >> changelog.md
+            git log --oneline --merges "${PREV_TAG}..${CURRENT_TAG}" --grep="Merge pull request" | sed 's/.*Merge pull request /- /' >> changelog.md || true
+          else
+            echo "- Initial release" >> changelog.md
+          fi
+          
+          echo "" >> changelog.md
+          echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${CURRENT_TAG}" >> changelog.md
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: false
+          prerelease: false
+          body_path: changelog.md
+          generate_release_notes: true
