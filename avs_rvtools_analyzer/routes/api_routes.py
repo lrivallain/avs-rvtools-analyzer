@@ -21,6 +21,7 @@ from ..models import (
     APIInfoResponse,
     AvailableRisksResponse,
     AzureOpenAIConfigRequest,
+    AzureOpenAIStatusResponse,
     AzureOpenAITestResponse,
     ErrorResponse,
     ExcelSheetInfo,
@@ -404,18 +405,19 @@ def setup_api_routes(app: FastAPI, mcp: FastMCP, config: AppConfig) -> None:
     async def get_ai_suggestion(request: AISuggestionRequest):
         """Get AI-powered suggestions for a specific migration risk."""
         try:
-            # Configure the Azure OpenAI service
-            configured = azure_openai_service.configure(
-                azure_endpoint=request.azure_endpoint,
-                api_key=request.api_key
-            )
-            
-            if not configured:
-                return AISuggestionResponse(
-                    success=False,
-                    error="Failed to configure Azure OpenAI client",
-                    risk_name=request.risk_name
+            # Check if already configured via env vars, otherwise configure with request data
+            if not azure_openai_service.configured_via_env:
+                configured = azure_openai_service.configure(
+                    azure_endpoint=request.azure_endpoint,
+                    api_key=request.api_key
                 )
+                
+                if not configured:
+                    return AISuggestionResponse(
+                        success=False,
+                        error="Failed to configure Azure OpenAI client",
+                        risk_name=request.risk_name
+                    )
             
             # Get AI suggestion
             suggestion = azure_openai_service.get_risk_analysis_suggestion(
@@ -454,13 +456,17 @@ def setup_api_routes(app: FastAPI, mcp: FastMCP, config: AppConfig) -> None:
         response_model=AzureOpenAITestResponse,
     )
     async def test_azure_openai_connection(request: AzureOpenAIConfigRequest):
-        """Test Azure OpenAI connection with provided credentials."""
+        """Test Azure OpenAI connection with provided credentials or environment variables."""
         try:
-            result = azure_openai_service.test_connection(
-                azure_endpoint=request.azure_endpoint,
-                api_key=request.api_key,
-                deployment_name=request.deployment_name
-            )
+            # If configured via env vars, test with env vars, otherwise use request data
+            if azure_openai_service.configured_via_env:
+                result = azure_openai_service.test_connection()
+            else:
+                result = azure_openai_service.test_connection(
+                    azure_endpoint=request.azure_endpoint,
+                    api_key=request.api_key,
+                    deployment_name=request.deployment_name
+                )
             
             return AzureOpenAITestResponse(
                 success=result["success"],
@@ -473,4 +479,27 @@ def setup_api_routes(app: FastAPI, mcp: FastMCP, config: AppConfig) -> None:
                 success=False,
                 message=f"Connection test failed: {str(e)}",
                 response=None
+            )
+
+    @app.get(
+        "/api/azure-openai-status",
+        tags=["AI Integration"],
+        summary="Get Azure OpenAI Configuration Status",
+        description="Get the current configuration status of Azure OpenAI integration",
+        response_model=AzureOpenAIStatusResponse,
+    )
+    async def get_azure_openai_status():
+        """Get Azure OpenAI configuration status."""
+        try:
+            status = azure_openai_service.get_configuration_status()
+            return AzureOpenAIStatusResponse(
+                is_configured=status["is_configured"],
+                configured_via_env=status["configured_via_env"],
+                deployment_name=status["deployment_name"]
+            )
+        except Exception as e:
+            return AzureOpenAIStatusResponse(
+                is_configured=False,
+                configured_via_env=False,
+                deployment_name=None
             )

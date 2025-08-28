@@ -408,3 +408,11 @@ class AzureOpenAITestResponse(BaseModel):
     success: bool = Field(description="Whether the connection test was successful")
     message: str = Field(description="Test result message")
     response: Optional[str] = Field(None, description="AI response from test call")
+
+
+class AzureOpenAIStatusResponse(BaseModel):
+    """Response model for Azure OpenAI configuration status."""
+
+    is_configured: bool = Field(description="Whether Azure OpenAI is configured")
+    configured_via_env: bool = Field(description="Whether configuration comes from environment variables")
+    deployment_name: Optional[str] = Field(None, description="Deployment name if configured via env vars")

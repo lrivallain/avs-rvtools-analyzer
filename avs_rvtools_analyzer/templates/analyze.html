@@ -41,6 +41,14 @@
     </div>
 </div>
 
+<!-- Azure OpenAI Disclaimer - Always visible when AI is available -->
+<div class="alert alert-warning ai-disclaimer" role="alert" style="display: none;">
+    <i class="fas fa-exclamation-triangle"></i> <strong>Disclaimer:</strong> 
+    AI-generated suggestions are for informational purposes only and should be thoroughly reviewed by qualified professionals. 
+    The tool maintainers cannot be held responsible for the accuracy or consequences of the provided suggestions. 
+    Always validate recommendations with your specific environment and requirements.
+</div>
+
 <!-- Azure OpenAI Configuration -->
 <div class="card mb-4" id="azure-openai-config">
     <div class="card-header">
@@ -54,12 +62,11 @@
         <div class="card-body">
             <p class="text-muted">Configure Azure OpenAI to get AI-powered suggestions for migration risks.</p>
             
-            <!-- Disclaimer Message -->
-            <div class="alert alert-warning" role="alert">
-                <i class="fas fa-exclamation-triangle"></i> <strong>Disclaimer:</strong> 
-                AI-generated suggestions are for informational purposes only and should be thoroughly reviewed by qualified professionals. 
-                The tool maintainers cannot be held responsible for the accuracy or consequences of the provided suggestions. 
-                Always validate recommendations with your specific environment and requirements.
+            <!-- Environment Variable Configuration Message -->
+            <div class="alert alert-info env-config-message" role="alert" style="display: none;">
+                <i class="fas fa-cog"></i> <strong>Environment Configuration:</strong> 
+                Azure OpenAI is configured using environment variables. The configuration form below is disabled.
+                <br><small>Deployment: <span id="env-deployment-name"></span></small>
             </div>
             
             <form id="azure-openai-form">
@@ -404,6 +411,9 @@
     document.addEventListener('DOMContentLoaded', function() {
         makeTablesResizable();
 
+        // Check Azure OpenAI configuration status
+        checkAzureOpenAIStatus();
+
         // Check for emergency risks and show warning popup
         checkForEmergencyRisks();
     });
@@ -479,65 +489,146 @@
         deploymentName: 'gpt-4'
     };
 
-    function testAzureOpenAIConnection() {
-        const endpoint = document.getElementById('azureEndpoint').value;
-        const apiKey = document.getElementById('apiKey').value;
-        const deploymentName = document.getElementById('deploymentName').value;
-
-        if (!endpoint || !apiKey) {
-            showStatusMessage('Please provide both Azure OpenAI endpoint and API key.', 'warning');
-            return;
-        }
-
-        showStatusMessage('Testing connection...', 'info');
-
-        fetch('/api/test-azure-openai', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                azure_endpoint: endpoint,
-                api_key: apiKey,
-                deployment_name: deploymentName
-            })
-        })
+    function checkAzureOpenAIStatus() {
+        fetch('/api/azure-openai-status')
         .then(response => response.json())
         .then(data => {
-            if (data.success) {
-                showStatusMessage(`✅ ${data.message}`, 'success');
-            } else {
-                showStatusMessage(`❌ ${data.message}`, 'danger');
+            if (data.is_configured) {
+                azureOpenAIConfigured = true;
+                
+                // Show disclaimer when AI is available
+                document.querySelector('.ai-disclaimer').style.display = 'block';
+                
+                // Show AI suggestion buttons
+                document.querySelectorAll('.ai-suggestion-btn').forEach(btn => {
+                    btn.style.display = '';
+                });
+                
+                if (data.configured_via_env) {
+                    // Show environment configuration message
+                    document.querySelector('.env-config-message').style.display = 'block';
+                    document.getElementById('env-deployment-name').textContent = data.deployment_name || 'Not specified';
+                    
+                    // Disable form fields and buttons
+                    const form = document.getElementById('azure-openai-form');
+                    const inputs = form.querySelectorAll('input');
+                    const buttons = form.querySelectorAll('button');
+                    
+                    inputs.forEach(input => {
+                        input.disabled = true;
+                        input.placeholder = 'Configured via environment variables';
+                    });
+                    
+                    buttons.forEach(button => {
+                        button.disabled = true;
+                    });
+                    
+                    // Update button text for env configuration
+                    buttons.forEach(button => {
+                        if (button.textContent.includes('Test Connection')) {
+                            button.innerHTML = '<i class="fas fa-cog"></i> Test Env Connection';
+                            button.disabled = false;
+                            button.onclick = () => testAzureOpenAIConnection();
+                        } else if (button.textContent.includes('Configure')) {
+                            button.innerHTML = '<i class="fas fa-check"></i> Configured via Env';
+                        }
+                    });
+                    
+                    showStatusMessage('✅ Azure OpenAI is configured via environment variables. AI suggestions are available.', 'success');
+                } else {
+                    showStatusMessage('ℹ️ Azure OpenAI is available but not configured. Please configure it to use AI suggestions.', 'info');
+                }
             }
         })
         .catch(error => {
-            showStatusMessage(`❌ Error testing connection: ${error.message}`, 'danger');
+            console.log('Azure OpenAI status check failed:', error);
+            // Silently fail - this just means OpenAI is not available
+        });
+    }
+
+    function testAzureOpenAIConnection() {
+        // Check if configured via env vars
+        fetch('/api/azure-openai-status')
+        .then(response => response.json())
+        .then(statusData => {
+            let requestBody = {};
+            
+            if (!statusData.configured_via_env) {
+                const endpoint = document.getElementById('azureEndpoint').value;
+                const apiKey = document.getElementById('apiKey').value;
+                const deploymentName = document.getElementById('deploymentName').value;
+
+                if (!endpoint || !apiKey) {
+                    showStatusMessage('Please provide both Azure OpenAI endpoint and API key.', 'warning');
+                    return;
+                }
+                
+                requestBody = {
+                    azure_endpoint: endpoint,
+                    api_key: apiKey,
+                    deployment_name: deploymentName
+                };
+            }
+
+            showStatusMessage('Testing connection...', 'info');
+
+            fetch('/api/test-azure-openai', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(requestBody)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showStatusMessage(`✅ ${data.message}`, 'success');
+                } else {
+                    showStatusMessage(`❌ ${data.message}`, 'danger');
+                }
+            })
+            .catch(error => {
+                showStatusMessage(`❌ Error testing connection: ${error.message}`, 'danger');
+            });
         });
     }
 
     function configureAzureOpenAI() {
-        const endpoint = document.getElementById('azureEndpoint').value;
-        const apiKey = document.getElementById('apiKey').value;
-        const deploymentName = document.getElementById('deploymentName').value;
+        // Check if already configured via env vars
+        fetch('/api/azure-openai-status')
+        .then(response => response.json())
+        .then(statusData => {
+            if (statusData.configured_via_env) {
+                showStatusMessage('Azure OpenAI is already configured via environment variables.', 'info');
+                return;
+            }
+            
+            const endpoint = document.getElementById('azureEndpoint').value;
+            const apiKey = document.getElementById('apiKey').value;
+            const deploymentName = document.getElementById('deploymentName').value;
 
-        if (!endpoint || !apiKey) {
-            showStatusMessage('Please provide both Azure OpenAI endpoint and API key.', 'warning');
-            return;
-        }
+            if (!endpoint || !apiKey) {
+                showStatusMessage('Please provide both Azure OpenAI endpoint and API key.', 'warning');
+                return;
+            }
 
-        azureOpenAIConfig = {
-            endpoint: endpoint,
-            apiKey: apiKey,
-            deploymentName: deploymentName
-        };
-        azureOpenAIConfigured = true;
+            azureOpenAIConfig = {
+                endpoint: endpoint,
+                apiKey: apiKey,
+                deploymentName: deploymentName
+            };
+            azureOpenAIConfigured = true;
 
-        // Show AI suggestion buttons
-        document.querySelectorAll('.ai-suggestion-btn').forEach(btn => {
-            btn.style.display = '';
+            // Show disclaimer when AI is configured
+            document.querySelector('.ai-disclaimer').style.display = 'block';
+
+            // Show AI suggestion buttons
+            document.querySelectorAll('.ai-suggestion-btn').forEach(btn => {
+                btn.style.display = '';
+            });
+
+            showStatusMessage('✅ Azure OpenAI configured successfully! AI suggestion buttons are now available on risk cards.', 'success');
         });
-
-        showStatusMessage('✅ Azure OpenAI configured successfully! AI suggestion buttons are now available on risk cards.', 'success');
     }
 
     function getAISuggestion(button) {
