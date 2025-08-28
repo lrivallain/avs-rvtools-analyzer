@@ -25,6 +25,7 @@ A unified FastAPI application for analyzing RVTools data with both web interface
   - Shared disks (blocking)
   - Clear text passwords (emergency)
   - VMkernel networks (warning)
+  - VM with Fault Tolerance (warning)
 
 ## AI integration disclaimer
 

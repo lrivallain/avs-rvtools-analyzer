@@ -110,9 +110,9 @@
                                                 <span class="badge rounded-pill {{ get_risk_badge_class(value) }}">
                                                     {{ get_risk_display_name(value) }}
                                                 </span>
-                                                {% elif value is sameas true or value|string|lower in ['true', 'yes', '1'] %}
+                                                {% elif value is sameas true or value|string|lower in ['true', 'yes'] %}
                                                     <span class="text-success"><strong>✓</strong></span>
-                                                {% elif value is sameas false or value|string|lower in ['false', 'no', '0'] %}
+                                                {% elif value is sameas false or value|string|lower in ['false', 'no'] %}
                                                     <span class="text-danger">✘</span>
                                                 {% elif 'MiB' in key and value|string|length > 0 %}
                                                     {{ value | convert_mib_to_human_readable }}

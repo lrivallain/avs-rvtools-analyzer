@@ -30,6 +30,7 @@ from avs_rvtools_analyzer.risk_detection import (
     detect_shared_disks,
     detect_clear_text_passwords,
     detect_vmkernel_network_vms,
+    detect_fault_tolerance_vms,
 )
 
 
@@ -854,3 +855,22 @@ class TestDetectVMkernelNetworkVMs:
 
         assert result['count'] == 0, "Should detect no VMs on VMkernel networks"
         assert result['data'] == [], "Should return empty data list"
+
+
+class TestDetectFaultToleranceVMs:
+    """Test fault tolerance VM risk detection individually."""
+
+    def test_detect_fault_tolerance_vms(self, comprehensive_excel_data):
+        """Test that fault tolerance VMs are detected."""
+        result = detect_fault_tolerance_vms(comprehensive_excel_data)
+
+        assert result['count'] > 0, "Should detect fault tolerance VMs"
+        assert 'data' in result
+
+        # Should find fault tolerance VMs
+        fault_tolerance_vms = result['data']
+        vm_names = [vm['VM'] for vm in fault_tolerance_vms]
+
+        expected_fault_tolerance = ['vm-ft-enabled-01 (primary)', 'vm-ft-enabled-02 (primary)', 'vm-ft-enabled-01 (secondary)']
+        for vm in expected_fault_tolerance:
+            assert vm in vm_names, f"Should detect {vm} as fault tolerant"
