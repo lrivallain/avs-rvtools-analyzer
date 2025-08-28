@@ -62,12 +62,21 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         types: |
+          Feat
           feat
+          Fix
           fix
+          Bug
+          bug
+          Docs
           docs
+          Style
           style
+          Refactor
           refactor
+          Test
           test
+          Chore
           chore
         requireScope: false
         ignoreLabels: |
