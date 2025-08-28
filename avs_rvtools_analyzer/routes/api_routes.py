@@ -15,9 +15,13 @@ from .. import __version__ as calver_version
 from ..config import AppConfig
 from ..helpers import clean_value_for_json
 from ..models import (
+    AISuggestionRequest,
+    AISuggestionResponse,
     AnalysisResponse,
     APIInfoResponse,
     AvailableRisksResponse,
+    AzureOpenAIConfigRequest,
+    AzureOpenAITestResponse,
     ErrorResponse,
     ExcelSheetInfo,
     ExcelToJsonResponse,
@@ -27,6 +31,7 @@ from ..models import (
     SKUInfo,
 )
 from ..services import AnalysisService, FileService, SKUService
+from ..services.azure_openai_service import AzureOpenAIService
 
 
 class AnalyzeFileRequest(BaseModel):
@@ -82,6 +87,7 @@ def setup_api_routes(app: FastAPI, mcp: FastMCP, config: AppConfig) -> None:
     file_service = FileService(config.files)
     analysis_service = AnalysisService()
     sku_service = SKUService(config.paths.sku_data_file)
+    azure_openai_service = AzureOpenAIService()
 
     # API Routes
     @app.get(
@@ -385,3 +391,86 @@ def setup_api_routes(app: FastAPI, mcp: FastMCP, config: AppConfig) -> None:
 
         # Return simplified response with just the data
         return json_result
+
+    # Azure OpenAI Integration Endpoints
+
+    @app.post(
+        "/api/ai-suggestion",
+        tags=["AI Integration"],
+        summary="Get AI Risk Analysis Suggestion",
+        description="Get AI-powered suggestions for a specific migration risk using Azure OpenAI",
+        response_model=AISuggestionResponse,
+    )
+    async def get_ai_suggestion(request: AISuggestionRequest):
+        """Get AI-powered suggestions for a specific migration risk."""
+        try:
+            # Configure the Azure OpenAI service
+            configured = azure_openai_service.configure(
+                azure_endpoint=request.azure_endpoint,
+                api_key=request.api_key
+            )
+            
+            if not configured:
+                return AISuggestionResponse(
+                    success=False,
+                    error="Failed to configure Azure OpenAI client",
+                    risk_name=request.risk_name
+                )
+            
+            # Get AI suggestion
+            suggestion = azure_openai_service.get_risk_analysis_suggestion(
+                risk_name=request.risk_name,
+                risk_description=request.risk_description,
+                risk_data=request.risk_data,
+                risk_level=request.risk_level,
+                deployment_name=request.deployment_name
+            )
+            
+            if suggestion:
+                return AISuggestionResponse(
+                    success=True,
+                    suggestion=suggestion,
+                    risk_name=request.risk_name
+                )
+            else:
+                return AISuggestionResponse(
+                    success=False,
+                    error="Failed to generate AI suggestion",
+                    risk_name=request.risk_name
+                )
+                
+        except Exception as e:
+            return AISuggestionResponse(
+                success=False,
+                error=f"Error generating AI suggestion: {str(e)}",
+                risk_name=request.risk_name
+            )
+
+    @app.post(
+        "/api/test-azure-openai",
+        tags=["AI Integration"],
+        summary="Test Azure OpenAI Connection",
+        description="Test connection to Azure OpenAI with provided credentials",
+        response_model=AzureOpenAITestResponse,
+    )
+    async def test_azure_openai_connection(request: AzureOpenAIConfigRequest):
+        """Test Azure OpenAI connection with provided credentials."""
+        try:
+            result = azure_openai_service.test_connection(
+                azure_endpoint=request.azure_endpoint,
+                api_key=request.api_key,
+                deployment_name=request.deployment_name
+            )
+            
+            return AzureOpenAITestResponse(
+                success=result["success"],
+                message=result["message"],
+                response=result.get("response")
+            )
+            
+        except Exception as e:
+            return AzureOpenAITestResponse(
+                success=False,
+                message=f"Connection test failed: {str(e)}",
+                response=None
+            )

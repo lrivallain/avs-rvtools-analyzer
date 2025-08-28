@@ -368,3 +368,43 @@ class StorageConstants:
 
     INDEPENDENT_PERSISTENT = "independent_persistent"
     LARGE_VM_THRESHOLD_TB = 10
+
+
+# Azure OpenAI Integration Models
+
+
+class AzureOpenAIConfigRequest(BaseModel):
+    """Request model for Azure OpenAI configuration."""
+
+    azure_endpoint: str = Field(description="Azure OpenAI endpoint URL")
+    api_key: str = Field(description="OpenAI API key")
+    deployment_name: str = Field(default="gpt-4", description="Azure OpenAI deployment name")
+
+
+class AISuggestionRequest(BaseModel):
+    """Request model for AI risk analysis suggestions."""
+
+    risk_name: str = Field(description="Name of the risk function")
+    risk_description: str = Field(description="Description of the risk")
+    risk_data: List[Dict[str, Any]] = Field(description="Risk data items")
+    risk_level: str = Field(description="Risk severity level")
+    azure_endpoint: str = Field(description="Azure OpenAI endpoint URL")
+    api_key: str = Field(description="OpenAI API key")
+    deployment_name: str = Field(default="gpt-4", description="Azure OpenAI deployment name")
+
+
+class AISuggestionResponse(BaseModel):
+    """Response model for AI risk analysis suggestions."""
+
+    success: bool = Field(description="Whether the suggestion generation was successful")
+    suggestion: Optional[str] = Field(None, description="AI-generated suggestion")
+    error: Optional[str] = Field(None, description="Error message if failed")
+    risk_name: str = Field(description="Name of the risk that was analyzed")
+
+
+class AzureOpenAITestResponse(BaseModel):
+    """Response model for Azure OpenAI connection test."""
+
+    success: bool = Field(description="Whether the connection test was successful")
+    message: str = Field(description="Test result message")
+    response: Optional[str] = Field(None, description="AI response from test call")

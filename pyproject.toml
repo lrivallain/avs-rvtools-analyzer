@@ -18,7 +18,8 @@ dependencies = [
     "uvicorn[standard]",
     "jinja2",
     "python-multipart",
-    "fastmcp"
+    "fastmcp",
+    "openai"
 ]
 
 [project.scripts]
