@@ -45,7 +45,7 @@ jobs:
 
     - name: Check import sorting (optional)
       run: |
-        uv run isort --check-only .
+        uv run isort --check-only --profile black .
       continue-on-error: true
 
     - name: Lint code (optional)
