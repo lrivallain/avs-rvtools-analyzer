@@ -1,0 +1,83 @@
+# Branch Protection and PR Checks
+name: PR Checks
+
+on:
+  pull_request:
+    branches: ["master"]
+
+jobs:
+  pr-checks:
+    name: PR Quality Checks
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+
+    - name: Install dependencies
+      run: |
+        uv sync --extra dev
+
+    - name: Run tests with coverage
+      run: |
+        uv run pytest --cov=avs_rvtools_analyzer --cov-report=html
+
+    - name: Save coverage report as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: htmlcov
+        path: htmlcov
+
+    - name: Check code formatting (optional)
+      run: |
+        uv run black --check .
+      continue-on-error: true
+
+    - name: Check import sorting (optional)
+      run: |
+        uv run isort --check-only --profile black .
+      continue-on-error: true
+
+    - name: Lint code (optional)
+      run: |
+        uv run flake8 --extend-exclude .venv,dist .
+      continue-on-error: true
+
+  pr-title-check:
+    name: PR Title Check
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Check PR title follows conventional commits
+      uses: amannn/action-semantic-pull-request@v5
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        types: |
+          Feat
+          feat
+          Fix
+          fix
+          Bug
+          bug
+          Docs
+          docs
+          Style
+          style
+          Refactor
+          refactor
+          Test
+          test
+          Chore
+          chore
+        requireScope: false
+        ignoreLabels: |
+          ignore-semantic-pull-request

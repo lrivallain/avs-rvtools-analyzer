@@ -1,24 +1,26 @@
 """
 File handling service for RVTools analyzer.
 """
+
+import io
+import logging
 import os
 import tempfile
 from pathlib import Path
-from typing import Set, Optional, Dict, Any
-import pandas as pd
-from fastapi import UploadFile, HTTPException
-import xlrd
-import openpyxl
+from typing import Any, Dict, Optional, Set
 from zipfile import BadZipFile
-import logging
-import io
+
+import openpyxl
+import pandas as pd
+import xlrd
+from fastapi import HTTPException, UploadFile
 
 from ..config import FileConfig
 from ..core.exceptions import (
     FileValidationError,
     ProtectedFileError,
+    TemporaryFileError,
     UnsupportedFileFormatError,
-    TemporaryFileError
 )
 
 logger = logging.getLogger(__name__)
@@ -48,7 +50,11 @@ class FileService:
             allowed_exts = list(self.config.allowed_extensions)
             raise UnsupportedFileFormatError(
                 f"Invalid file format. Please upload a file with one of these extensions: {', '.join(f'.{ext}' for ext in allowed_exts)}",
-                file_extension=file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else None
+                file_extension=(
+                    file.filename.rsplit(".", 1)[-1].lower()
+                    if "." in file.filename
+                    else None
+                ),
             )
 
     def _is_allowed_file(self, filename: str) -> bool:
@@ -64,7 +70,7 @@ class FileService:
         if not filename:
             return False
 
-        extension = filename.rsplit('.', 1)[-1].lower()
+        extension = filename.rsplit(".", 1)[-1].lower()
         return extension in self.config.allowed_extensions
 
     async def save_uploaded_file(self, file: UploadFile) -> Path:
@@ -83,8 +89,7 @@ class FileService:
         try:
             # Create temporary file
             temp_file = tempfile.NamedTemporaryFile(
-                delete=False,
-                suffix=self.config.temp_file_suffix
+                delete=False, suffix=self.config.temp_file_suffix
             )
 
             # Read and write file content
@@ -129,7 +134,9 @@ class FileService:
 
             # Try to load with openpyxl first (for .xlsx files)
             try:
-                workbook = openpyxl.load_workbook(file_stream, read_only=True, data_only=True)
+                workbook = openpyxl.load_workbook(
+                    file_stream, read_only=True, data_only=True
+                )
                 sheets = {}
 
                 for sheet_name in workbook.sheetnames:
@@ -138,9 +145,14 @@ class FileService:
                     headers = []
 
                     # Get headers from first row
-                    first_row = next(sheet.iter_rows(min_row=1, max_row=1, values_only=True), None)
+                    first_row = next(
+                        sheet.iter_rows(min_row=1, max_row=1, values_only=True), None
+                    )
                     if first_row:
-                        headers = [str(cell) if cell is not None else f"Column_{i}" for i, cell in enumerate(first_row)]
+                        headers = [
+                            str(cell) if cell is not None else f"Column_{i}"
+                            for i, cell in enumerate(first_row)
+                        ]
 
                     # Get data from remaining rows
                     for row in sheet.iter_rows(min_row=2, values_only=True):
@@ -152,9 +164,9 @@ class FileService:
                             data.append(row_dict)
 
                     sheets[sheet_name] = {
-                        'headers': headers,
-                        'data': data,
-                        'row_count': len(data)
+                        "headers": headers,
+                        "data": data,
+                        "row_count": len(data),
                     }
 
                 workbook.close()
@@ -179,28 +191,37 @@ class FileService:
 
                         if sheet.nrows > 0:
                             # Get headers from first row
-                            headers = [str(sheet.cell_value(0, col)) for col in range(sheet.ncols)]
+                            headers = [
+                                str(sheet.cell_value(0, col))
+                                for col in range(sheet.ncols)
+                            ]
 
                             # Get data from remaining rows
                             for row in range(1, sheet.nrows):
                                 row_dict = {}
                                 for col in range(sheet.ncols):
                                     if col < len(headers):
-                                        row_dict[headers[col]] = sheet.cell_value(row, col)
+                                        row_dict[headers[col]] = sheet.cell_value(
+                                            row, col
+                                        )
                                 data.append(row_dict)
 
                         sheets[sheet_name] = {
-                            'headers': headers,
-                            'data': data,
-                            'row_count': len(data)
+                            "headers": headers,
+                            "data": data,
+                            "row_count": len(data),
                         }
 
-                    logger.debug(f"Loaded Excel file (xls) from memory with {len(sheets)} sheets")
+                    logger.debug(
+                        f"Loaded Excel file (xls) from memory with {len(sheets)} sheets"
+                    )
                     return sheets
 
                 except xlrd.XLRDError as e:
                     if "password" in str(e).lower() or "encrypted" in str(e).lower():
-                        raise ProtectedFileError("File appears to be password protected")
+                        raise ProtectedFileError(
+                            "File appears to be password protected"
+                        )
                     raise FileValidationError(f"Error reading Excel file: {str(e)}")
 
         except (ProtectedFileError, FileValidationError):
@@ -208,17 +229,25 @@ class FileService:
             raise
         except Exception as e:
             error_msg = str(e).lower()
-            if "password" in error_msg or "encrypted" in error_msg or "protected" in error_msg:
-                raise ProtectedFileError("File appears to be password protected or encrypted")
+            if (
+                "password" in error_msg
+                or "encrypted" in error_msg
+                or "protected" in error_msg
+            ):
+                raise ProtectedFileError(
+                    "File appears to be password protected or encrypted"
+                )
 
             logger.error(f"Error loading Excel file from memory: {str(e)}")
-            raise FileValidationError(f"Error loading Excel file from memory: {str(e)}", file_type="Excel")
+            raise FileValidationError(
+                f"Error loading Excel file from memory: {str(e)}", file_type="Excel"
+            )
         finally:
             # Ensure file stream is closed and content is cleared from memory
-            if 'file_stream' in locals():
+            if "file_stream" in locals():
                 file_stream.close()
             # Clear the content variable to free memory
-            if 'content' in locals():
+            if "content" in locals():
                 del content
 
     def load_excel_file(self, file_path: Path) -> Dict[str, Any]:
@@ -244,7 +273,9 @@ class FileService:
 
             # Try to load with openpyxl first (for .xlsx files)
             try:
-                workbook = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
+                workbook = openpyxl.load_workbook(
+                    file_path, read_only=True, data_only=True
+                )
                 sheets = {}
 
                 for sheet_name in workbook.sheetnames:
@@ -253,9 +284,14 @@ class FileService:
                     headers = []
 
                     # Get headers from first row
-                    first_row = next(sheet.iter_rows(min_row=1, max_row=1, values_only=True), None)
+                    first_row = next(
+                        sheet.iter_rows(min_row=1, max_row=1, values_only=True), None
+                    )
                     if first_row:
-                        headers = [str(cell) if cell is not None else f"Column_{i}" for i, cell in enumerate(first_row)]
+                        headers = [
+                            str(cell) if cell is not None else f"Column_{i}"
+                            for i, cell in enumerate(first_row)
+                        ]
 
                     # Get data from remaining rows
                     for row in sheet.iter_rows(min_row=2, values_only=True):
@@ -267,9 +303,9 @@ class FileService:
                             data.append(row_dict)
 
                     sheets[sheet_name] = {
-                        'headers': headers,
-                        'data': data,
-                        'row_count': len(data)
+                        "headers": headers,
+                        "data": data,
+                        "row_count": len(data),
                     }
 
                 workbook.close()
@@ -291,20 +327,25 @@ class FileService:
 
                         if sheet.nrows > 0:
                             # Get headers from first row
-                            headers = [str(sheet.cell_value(0, col)) for col in range(sheet.ncols)]
+                            headers = [
+                                str(sheet.cell_value(0, col))
+                                for col in range(sheet.ncols)
+                            ]
 
                             # Get data from remaining rows
                             for row in range(1, sheet.nrows):
                                 row_dict = {}
                                 for col in range(sheet.ncols):
                                     if col < len(headers):
-                                        row_dict[headers[col]] = sheet.cell_value(row, col)
+                                        row_dict[headers[col]] = sheet.cell_value(
+                                            row, col
+                                        )
                                 data.append(row_dict)
 
                         sheets[sheet_name] = {
-                            'headers': headers,
-                            'data': data,
-                            'row_count': len(data)
+                            "headers": headers,
+                            "data": data,
+                            "row_count": len(data),
                         }
 
                     logger.debug(f"Loaded Excel file (xls) with {len(sheets)} sheets")
@@ -312,7 +353,9 @@ class FileService:
 
                 except xlrd.XLRDError as e:
                     if "password" in str(e).lower() or "encrypted" in str(e).lower():
-                        raise ProtectedFileError("File appears to be password protected")
+                        raise ProtectedFileError(
+                            "File appears to be password protected"
+                        )
                     raise FileValidationError(f"Error reading Excel file: {str(e)}")
 
         except (ProtectedFileError, FileValidationError):
@@ -320,11 +363,19 @@ class FileService:
             raise
         except Exception as e:
             error_msg = str(e).lower()
-            if "password" in error_msg or "encrypted" in error_msg or "protected" in error_msg:
-                raise ProtectedFileError("File appears to be password protected or encrypted")
+            if (
+                "password" in error_msg
+                or "encrypted" in error_msg
+                or "protected" in error_msg
+            ):
+                raise ProtectedFileError(
+                    "File appears to be password protected or encrypted"
+                )
 
             logger.error(f"Error loading Excel file {file_path}: {str(e)}")
-            raise FileValidationError(f"Error loading Excel file: {str(e)}", file_type="Excel")
+            raise FileValidationError(
+                f"Error loading Excel file: {str(e)}", file_type="Excel"
+            )
 
     def cleanup_temp_file(self, file_path: Path) -> None:
         """
@@ -374,7 +425,7 @@ class FileService:
             if len(cleanup_errors) == len(self.temp_files):
                 raise TemporaryFileError(
                     f"Failed to cleanup temporary files: {'; '.join(cleanup_errors)}",
-                    operation="cleanup"
+                    operation="cleanup",
                 )
 
     def get_excel_sheets_data(self, excel_data: Dict[str, Any]) -> dict:
@@ -391,12 +442,14 @@ class FileService:
         try:
             for sheet_name, sheet_info in excel_data.items():
                 # Extract just the data from each sheet
-                sheets[sheet_name] = sheet_info.get('data', [])
+                sheets[sheet_name] = sheet_info.get("data", [])
             return sheets
 
         except Exception as e:
             logger.error(f"Error extracting sheets data: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Error processing Excel sheets: {str(e)}")
+            raise HTTPException(
+                status_code=500, detail=f"Error processing Excel sheets: {str(e)}"
+            )
 
     def __del__(self):
         """Cleanup temp files when service is destroyed."""

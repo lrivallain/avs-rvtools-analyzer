@@ -1,12 +1,14 @@
 """
 Helper functions for RVTools risk detection.
 """
-import json
+
 import functools
-from typing import Dict, List, Any, Optional
-import pandas as pd
-from pathlib import Path
+import json
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+import pandas as pd
 
 
 @functools.lru_cache(maxsize=1)
@@ -20,12 +22,14 @@ def load_sku_data() -> List[Dict]:
     Raises:
         FileNotFoundError: If the SKU data file is not found
     """
-    sku_file_path = Path(__file__).parent / 'static' / 'sku.json'
-    with open(sku_file_path, 'r', encoding='utf-8') as f:
+    sku_file_path = Path(__file__).parent / "static" / "sku.json"
+    with open(sku_file_path, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
-def safe_sheet_access(excel_data: pd.ExcelFile, sheet_name: str) -> Optional[pd.DataFrame]:
+def safe_sheet_access(
+    excel_data: pd.ExcelFile, sheet_name: str
+) -> Optional[pd.DataFrame]:
     """
     Safely access a sheet from Excel data.
 
@@ -43,10 +47,12 @@ def safe_sheet_access(excel_data: pd.ExcelFile, sheet_name: str) -> Optional[pd.
 
 def create_empty_result() -> Dict[str, Any]:
     """Create an empty result dictionary for when no data is found."""
-    return {'count': 0, 'data': []}
+    return {"count": 0, "data": []}
 
 
-def filter_dataframe_by_condition(df: pd.DataFrame, condition, columns: List[str]) -> List[Dict[str, Any]]:
+def filter_dataframe_by_condition(
+    df: pd.DataFrame, condition, columns: List[str]
+) -> List[Dict[str, Any]]:
     """
     Filter dataframe by condition and return selected columns as list of dictionaries.
 
@@ -65,7 +71,7 @@ def filter_dataframe_by_condition(df: pd.DataFrame, condition, columns: List[str
     if filtered_df.empty:
         return []
 
-    return filtered_df[columns].to_dict(orient='records')
+    return filtered_df[columns].to_dict(orient="records")
 
 
 def get_risk_category(func_name: str) -> str:
@@ -78,18 +84,23 @@ def get_risk_category(func_name: str) -> str:
     Returns:
         Category string
     """
-    if 'esx' in func_name or 'host' in func_name:
-        return 'Infrastructure'
-    elif 'vm' in func_name or 'memory' in func_name or 'vcpu' in func_name or 'provisioned' in func_name:
-        return 'Virtual Machines'
-    elif 'disk' in func_name or 'cdrom' in func_name or 'snapshot' in func_name:
-        return 'Storage'
-    elif 'switch' in func_name or 'dvport' in func_name:
-        return 'Networking'
-    elif 'usb' in func_name or 'oracle' in func_name or 'vmtools' in func_name:
-        return 'Compatibility'
+    if "esx" in func_name or "host" in func_name:
+        return "Infrastructure"
+    elif (
+        "vm" in func_name
+        or "memory" in func_name
+        or "vcpu" in func_name
+        or "provisioned" in func_name
+    ):
+        return "Virtual Machines"
+    elif "disk" in func_name or "cdrom" in func_name or "snapshot" in func_name:
+        return "Storage"
+    elif "switch" in func_name or "dvport" in func_name:
+        return "Networking"
+    elif "usb" in func_name or "oracle" in func_name or "vmtools" in func_name:
+        return "Compatibility"
     else:
-        return 'General'
+        return "General"
 
 
 def convert_mib_to_tb(mib_value: float) -> float:
@@ -103,6 +114,7 @@ def convert_mib_to_tb(mib_value: float) -> float:
         Value in TB
     """
     from .models import StorageThresholds
+
     return mib_value * StorageThresholds.MIB_TO_TB_CONVERSION
 
 
@@ -116,7 +128,7 @@ def clean_function_name_for_display(func_name: str) -> str:
     Returns:
         Cleaned display name
     """
-    return func_name.replace('detect_', '').replace('_', ' ').title()
+    return func_name.replace("detect_", "").replace("_", " ").title()
 
 
 def clean_value_for_json(value) -> str:
@@ -129,7 +141,7 @@ def clean_value_for_json(value) -> str:
         The cleaned value
     """
     if value is None:
-        return ''
+        return ""
     elif isinstance(value, datetime):
         return value.isoformat()
     elif isinstance(value, (int, float, str, bool)):
@@ -150,7 +162,7 @@ def json_serializer(obj):
     """
     if isinstance(obj, datetime):
         return obj.isoformat()
-    elif hasattr(obj, '__dict__'):
+    elif hasattr(obj, "__dict__"):
         return obj.__dict__
     else:
         return str(obj)

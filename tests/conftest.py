@@ -3,10 +3,11 @@
 Test configuration and shared fixtures.
 """
 
-import pytest
-import pandas as pd
-from pathlib import Path
 import sys
+from pathlib import Path
+
+import pandas as pd
+import pytest
 
 # Add the project root to the Python path
 project_root = Path(__file__).parent.parent
@@ -26,7 +27,9 @@ def ensure_test_data_exists(force_recreate: bool = False):
     Returns:
         Path: The path to the test data file.
     """
-    test_data_path = Path(__file__).parent / "test-data" / "comprehensive_test_data.xlsx"
+    test_data_path = (
+        Path(__file__).parent / "test-data" / "comprehensive_test_data.xlsx"
+    )
 
     # Test folder exists
     if not test_data_path.parent.exists():

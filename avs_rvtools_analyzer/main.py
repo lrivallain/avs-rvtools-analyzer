@@ -2,40 +2,41 @@
 MCP Server for RVTools Analyzer with integrated web UI.
 Exposes RVTools analysis capabilities through Model Context Protocol and web interface.
 """
+
 import asyncio
 import json
-import tempfile
+import logging
 import os
-from pathlib import Path
-from typing import Any, Dict, List
+import tempfile
 from contextlib import asynccontextmanager
-import numpy as np
-import xlrd
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
+import numpy as np
 import pandas as pd
-from fastapi import FastAPI, HTTPException, File, UploadFile, Form, Request
-from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
+import xlrd
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.middleware.cors import CORSMiddleware
 from fastmcp import FastMCP
 from pydantic import BaseModel
-from typing import Optional
-import logging
 
-from .risk_detection import gather_all_risks, get_available_risks
+from . import __version__ as calver_version
+from .config import AppConfig
+from .core.error_handlers import setup_error_handlers
 from .helpers import load_sku_data
+from .risk_detection import gather_all_risks, get_available_risks
+from .routes.api_routes import setup_api_routes
+from .routes.web_routes import setup_web_routes
 from .utils import (
-    convert_mib_to_human_readable,
+    ColoredFormatter,
     allowed_file,
+    convert_mib_to_human_readable,
     get_risk_badge_class,
     get_risk_display_name,
-    ColoredFormatter)
-from .config import AppConfig
-from .routes.web_routes import setup_web_routes
-from .routes.api_routes import setup_api_routes
-from .core.error_handlers import setup_error_handlers
-from . import __version__ as calver_version
+)
 
 
 def setup_logging(debug: bool = False):
@@ -61,14 +62,14 @@ def setup_logging(debug: bool = False):
     root_logger.addHandler(console_handler)
 
     # Configure specific loggers for our application modules
-    app_logger = logging.getLogger('avs_rvtools_analyzer')
+    app_logger = logging.getLogger("avs_rvtools_analyzer")
     app_logger.setLevel(log_level)
 
     # Silence noisy third-party loggers unless in debug mode
     if not debug:
-        logging.getLogger('urllib3').setLevel(logging.WARNING)
-        logging.getLogger('requests').setLevel(logging.WARNING)
-        logging.getLogger('fastapi').setLevel(logging.WARNING)
+        logging.getLogger("urllib3").setLevel(logging.WARNING)
+        logging.getLogger("requests").setLevel(logging.WARNING)
+        logging.getLogger("fastapi").setLevel(logging.WARNING)
 
 
 # Set up logger with custom formatter
@@ -76,6 +77,7 @@ logger = logging.getLogger(__name__)
 
 # Global app instance for reload functionality
 app = None
+
 
 def create_app(config: AppConfig = None, debug: bool = False) -> FastAPI:
     """Create and configure FastAPI application."""
@@ -91,7 +93,7 @@ def create_app(config: AppConfig = None, debug: bool = False) -> FastAPI:
 
     # Initialize MCP app
     mcp = FastMCP(config.mcp.name)
-    mcp_app = mcp.http_app(path='/')
+    mcp_app = mcp.http_app(path="/")
 
     # Create FastAPI app with configuration
     fastapi_app = FastAPI(
@@ -99,7 +101,7 @@ def create_app(config: AppConfig = None, debug: bool = False) -> FastAPI:
         version=calver_version,
         description=config.fastapi.description,
         tags_metadata=config.fastapi.tags_metadata,
-        lifespan=mcp_app.lifespan
+        lifespan=mcp_app.lifespan,
     )
 
     # Mount MCP app
@@ -111,7 +113,9 @@ def create_app(config: AppConfig = None, debug: bool = False) -> FastAPI:
 
     # Setup static files if they exist
     if static_dir.exists():
-        fastapi_app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+        fastapi_app.mount(
+            "/static", StaticFiles(directory=str(static_dir)), name="static"
+        )
 
     # Add CORS middleware with configuration
     fastapi_app.add_middleware(
@@ -123,7 +127,9 @@ def create_app(config: AppConfig = None, debug: bool = False) -> FastAPI:
     )
 
     # Setup routes using modules
-    setup_web_routes(fastapi_app, templates, config, config.server.host, config.server.port)
+    setup_web_routes(
+        fastapi_app, templates, config, config.server.host, config.server.port
+    )
     setup_api_routes(fastapi_app, mcp, config)
 
     # Setup error handlers for custom exceptions
@@ -131,12 +137,15 @@ def create_app(config: AppConfig = None, debug: bool = False) -> FastAPI:
 
     return fastapi_app
 
+
 def _setup_jinja_templates(templates: Jinja2Templates) -> None:
     """Setup Jinja2 template configuration."""
-    templates.env.filters['convert_mib_to_human_readable'] = convert_mib_to_human_readable
-    templates.env.globals['calver_version'] = calver_version
-    templates.env.globals['get_risk_badge_class'] = get_risk_badge_class
-    templates.env.globals['get_risk_display_name'] = get_risk_display_name
+    templates.env.filters["convert_mib_to_human_readable"] = (
+        convert_mib_to_human_readable
+    )
+    templates.env.globals["calver_version"] = calver_version
+    templates.env.globals["get_risk_badge_class"] = get_risk_badge_class
+    templates.env.globals["get_risk_display_name"] = get_risk_display_name
 
 
 class RVToolsAnalyzeServer:
@@ -184,7 +193,7 @@ class RVToolsAnalyzeServer:
                 port=port,
                 log_level=uvicorn_log_level,
                 reload=True,
-                factory=True
+                factory=True,
             )
         else:
             # Create app directly for non-reload mode
@@ -194,7 +203,7 @@ class RVToolsAnalyzeServer:
                 host=host,
                 port=port,
                 log_level=uvicorn_log_level,
-                timeout_graceful_shutdown=self.config.server.timeout_graceful_shutdown
+                timeout_graceful_shutdown=self.config.server.timeout_graceful_shutdown,
             )
             server = uvicorn.Server(config)
             await server.serve()
@@ -208,10 +217,12 @@ class RVToolsAnalyzeServer:
         logger.info(f"  📄 OpenAPI JSON: http://{host}:{port}/openapi.json")
         logger.info(f"  🔗 MCP API: http://{host}:{port}/mcp")
 
+
 # Create global app instance for reload functionality
 def app():
     """Factory function to create app for uvicorn reload."""
     return create_app()
+
 
 async def server_main():
     """Main entry point for the MCP server."""
@@ -221,10 +232,23 @@ async def server_main():
     default_config = AppConfig()
 
     parser = argparse.ArgumentParser(description="AVS RVTools Analyzer")
-    parser.add_argument("--host", default=default_config.server.host, help=f"Host to bind to (default: {default_config.server.host})")
-    parser.add_argument("--port", type=int, default=default_config.server.port, help=f"Port to bind to (default: {default_config.server.port})")
-    parser.add_argument("--reload", action="store_true", help="Enable auto-reload for development")
-    parser.add_argument("--debug", action="store_true", help="Enable debug logging level")
+    parser.add_argument(
+        "--host",
+        default=default_config.server.host,
+        help=f"Host to bind to (default: {default_config.server.host})",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=default_config.server.port,
+        help=f"Port to bind to (default: {default_config.server.port})",
+    )
+    parser.add_argument(
+        "--reload", action="store_true", help="Enable auto-reload for development"
+    )
+    parser.add_argument(
+        "--debug", action="store_true", help="Enable debug logging level"
+    )
 
     args = parser.parse_args()
 

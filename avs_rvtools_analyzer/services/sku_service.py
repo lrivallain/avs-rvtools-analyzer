@@ -1,13 +1,15 @@
 """
 SKU service for Azure VMware Solution capabilities.
 """
-from typing import Dict, Any, List, Optional
-import pandas as pd
+
 import logging
 from pathlib import Path
+from typing import Any, Dict, List, Optional
 
-from ..helpers import load_sku_data
+import pandas as pd
+
 from ..core.exceptions import SKUDataError
+from ..helpers import load_sku_data
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +42,9 @@ class SKUService:
             raise SKUDataError("SKU data file not found", operation="load")
         except Exception as e:
             logger.error(f"Error retrieving SKU information: {str(e)}")
-            raise SKUDataError(f"Error retrieving SKU information: {str(e)}", operation="load")
+            raise SKUDataError(
+                f"Error retrieving SKU information: {str(e)}", operation="load"
+            )
 
     def refresh_sku_data(self) -> None:
         """Refresh cached SKU data by reloading from file."""
