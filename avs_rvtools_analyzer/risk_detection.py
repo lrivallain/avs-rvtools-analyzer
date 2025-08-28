@@ -852,6 +852,56 @@ def detect_vmkernel_network_vms(excel_data: pd.ExcelFile) -> Dict[str, Any]:
     return {'count': len(vmkernel_vms), 'data': vmkernel_vms}
 
 
+@risk_info(
+    level=RiskLevel.WARNING,
+    description="VMs with Fault Tolerance enabled",
+    alert_message="""Fault Tolerance (FT) is a feature that provides continuous availability for VMs by creating a live shadow instance.
+    However, Virtual machines cannot be migrated while they are Fault Tolerance enabled.
+    <br><br>To migrate FT-enabled VMs: <ol>
+        <li><strong>Temporarily</strong> turn off Fault Tolerance,</li>
+        <li>Perform migration,</li>
+        <li>When this operation is complete, turn Fault Tolerance back on</li>
+    </ol>"""
+)
+def detect_fault_tolerance_vms(excel_data: pd.ExcelFile) -> Dict[str, Any]:
+    """
+    Detect VMs with Fault Tolerance enabled.
+
+    Fault Tolerance (FT) is a feature that provides continuous availability for VMs by creating a live shadow instance.
+    However, Virtual machines cannot be migrated while they are Fault Tolerance enabled.
+
+    Args:
+        excel_data: Parsed Excel file from RVTools
+
+    Returns:
+        Dictionary with count and data about VMs with Fault Tolerance enabled
+    """
+    ft_vms = []
+
+    # Check vInfo sheet for VMs with FT enabled
+    vm_data = safe_sheet_access(excel_data, 'vInfo')
+
+    if vm_data.empty or 'FT State' not in vm_data.columns:
+        logger.warning("detect_fault_tolerance_vms: No vInfo sheet or FT State column found")
+        return {'count': 0, 'data': []}
+
+    # Find VMs with FT enabled
+    for _, row in vm_data.iterrows():
+        vm_name = row.get('VM', 'Unknown')
+        ft_enabled = row.get('FT State', 'notConfigured')
+
+        if ft_enabled != 'notConfigured':
+            ft_vms.append({
+                'VM': vm_name,
+                'Powerstate': row.get('Powerstate', ''),
+                'FT State': row.get('FT State', ''),
+                'FT Role': row.get('FT Role', '')
+            })
+
+    logger.info(f"detect_fault_tolerance_vms: Found {len(ft_vms)} VMs with Fault Tolerance enabled")
+    return {'count': len(ft_vms), 'data': ft_vms}
+
+
 ########################################################################################################################
 #                                                                                                                      #
 #                                         End of Risk Detection Functions                                              #
@@ -885,6 +935,7 @@ def get_risk_functions_list() -> List:
         detect_shared_disks,
         detect_clear_text_passwords,
         detect_vmkernel_network_vms,
+        detect_fault_tolerance_vms,
     ]
 
 def get_total_risk_functions_count() -> int:

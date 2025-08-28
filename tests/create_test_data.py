@@ -82,7 +82,13 @@ VMS = [
     {"name": "vm-mixed-issues-01", "type": "mixed", "os": "Oracle Linux Server 7.9", "hw_version": 6, "cpus": 80, "memory": 1572864, "provisioned": 10737418240},
 
     # Baseline
-    {"name": "vm-baseline-good", "type": "baseline"}
+    {"name": "vm-baseline-good", "type": "baseline"},
+
+    # VM with Fault Tolerance enabled
+    {"name": "vm-ft-enabled-01 (primary)", "type": "ft_enabled", "ft_state": "running", "ft_role": "1"},
+    {"name": "vm-ft-enabled-01 (secondary)", "type": "ft_enabled", "ft_state": "running", "ft_role": "2"},
+    {"name": "vm-ft-enabled-02 (primary)", "type": "ft_enabled", "ft_state": "needSecondary", "ft_role": "1"},
+    {"name": "vm-ft-notenabled-01", "type": "ft_enabled", "ft_state": "notConfigured", "ft_role": ""},
 ]
 
 # Host definitions
@@ -232,7 +238,9 @@ def build_vinfo_sheet() -> pd.DataFrame:
             "Datacenter": vm_data["datacenter"],
             "Cluster": vm_data["cluster"],
             "Host": vm_data["host"],
-            "Annotation": vm_data.get("annotation", "")
+            "Annotation": vm_data.get("annotation", ""),
+            "FT State": vm_data.get("ft_state", "notConfigured"),
+            "FT Role": vm_data.get("ft_role", "primary")
         })
     return pd.DataFrame(data)
 
