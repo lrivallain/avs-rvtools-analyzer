@@ -1,6 +1,7 @@
 """
 Analysis service for RVTools data processing.
 """
+
 import logging
 from typing import Any, Dict
 
@@ -23,7 +24,7 @@ class AnalysisService:
         self,
         excel_data: Dict[str, Any],
         include_details: bool = False,
-        filter_zero_counts: bool = True
+        filter_zero_counts: bool = True,
     ) -> Dict[str, Any]:
         """
         Perform risk analysis on RVTools data.
@@ -108,9 +109,9 @@ class AnalysisService:
                     raise ValueError(f"Sheet '{sheet_name}' not found")
 
                 sheet_data = self._data[sheet_name]
-                if isinstance(sheet_data, dict) and 'data' in sheet_data:
+                if isinstance(sheet_data, dict) and "data" in sheet_data:
                     # Convert list of dictionaries to DataFrame
-                    return pd.DataFrame(sheet_data['data'])
+                    return pd.DataFrame(sheet_data["data"])
                 else:
                     # Assume it's already in DataFrame format or can be converted
                     return pd.DataFrame(sheet_data)
@@ -165,17 +166,14 @@ class AnalysisService:
         Returns:
             Simplified summary results
         """
-        summary = {
-            "summary": full_results["summary"],
-            "risks": {}
-        }
+        summary = {"summary": full_results["summary"], "risks": {}}
 
         for risk_name, risk_data in full_results["risks"].items():
             summary["risks"][risk_name] = {
                 "count": risk_data["count"],
                 "risk_level": risk_data.get("risk_level", "info"),
                 "risk_info": risk_data.get("risk_info", {}),
-                "has_data": len(risk_data.get("data", [])) > 0
+                "has_data": len(risk_data.get("data", [])) > 0,
             }
 
         return summary
@@ -190,7 +188,7 @@ class AnalysisService:
         Raises:
             InsufficientDataError: If validation fails
         """
-        required_sheets = ['vInfo']  # Basic requirement for most analyses
+        required_sheets = ["vInfo"]  # Basic requirement for most analyses
 
         # excel_data is a dictionary with sheet names as keys
         if not isinstance(excel_data, dict):
@@ -198,16 +196,22 @@ class AnalysisService:
 
         available_sheets = list(excel_data.keys())
 
-        missing_sheets = [sheet for sheet in required_sheets if sheet not in available_sheets]
+        missing_sheets = [
+            sheet for sheet in required_sheets if sheet not in available_sheets
+        ]
 
         if missing_sheets:
             logger.warning(f"Missing recommended sheets: {missing_sheets}")
             # Don't raise an error, just log a warning as some analyses might still work
 
         if not available_sheets:
-            raise InsufficientDataError("Excel file appears to be empty or corrupted - no sheets found")
+            raise InsufficientDataError(
+                "Excel file appears to be empty or corrupted - no sheets found"
+            )
 
-        logger.debug(f"Excel file validation passed. Available sheets: {available_sheets}")
+        logger.debug(
+            f"Excel file validation passed. Available sheets: {available_sheets}"
+        )
 
     def get_analysis_metadata(self, excel_data: pd.ExcelFile) -> Dict[str, Any]:
         """
@@ -223,18 +227,18 @@ class AnalysisService:
             metadata = {
                 "total_sheets": len(excel_data.sheet_names),
                 "sheet_names": excel_data.sheet_names,
-                "file_type": "RVTools Export"
+                "file_type": "RVTools Export",
             }
 
             # Try to get basic VM count if vInfo sheet exists
-            if 'vInfo' in excel_data.sheet_names:
+            if "vInfo" in excel_data.sheet_names:
                 try:
-                    vinfo_data = excel_data.parse('vInfo')
+                    vinfo_data = excel_data.parse("vInfo")
                     metadata["total_vms"] = len(vinfo_data)
 
                     # Get unique host count if Host column exists
-                    if 'Host' in vinfo_data.columns:
-                        metadata["total_hosts"] = vinfo_data['Host'].nunique()
+                    if "Host" in vinfo_data.columns:
+                        metadata["total_hosts"] = vinfo_data["Host"].nunique()
 
                 except Exception as e:
                     logger.debug(f"Could not extract VM metadata: {str(e)}")
@@ -244,7 +248,11 @@ class AnalysisService:
         except Exception as e:
             logger.warning(f"Error extracting metadata: {str(e)}")
             return {
-                "total_sheets": len(excel_data.sheet_names) if hasattr(excel_data, 'sheet_names') else 0,
-                "sheet_names": getattr(excel_data, 'sheet_names', []),
-                "file_type": "Unknown"
+                "total_sheets": (
+                    len(excel_data.sheet_names)
+                    if hasattr(excel_data, "sheet_names")
+                    else 0
+                ),
+                "sheet_names": getattr(excel_data, "sheet_names", []),
+                "file_type": "Unknown",
             }

@@ -1,6 +1,7 @@
 """
 Custom exceptions for AVS RVTools Analyzer.
 """
+
 from typing import Any, Dict, Optional
 
 
@@ -11,7 +12,7 @@ class RVToolsError(Exception):
         self,
         message: str,
         error_code: Optional[str] = None,
-        details: Optional[Dict[str, Any]] = None
+        details: Optional[Dict[str, Any]] = None,
     ):
         super().__init__(message)
         self.message = message
@@ -24,7 +25,7 @@ class RVToolsError(Exception):
             "error": self.__class__.__name__,
             "message": self.message,
             "error_code": self.error_code,
-            "details": self.details
+            "details": self.details,
         }
 
 
@@ -35,7 +36,7 @@ class FileValidationError(RVToolsError):
         self,
         message: str,
         filename: Optional[str] = None,
-        allowed_extensions: Optional[list] = None
+        allowed_extensions: Optional[list] = None,
     ):
         super().__init__(message, error_code="FILE_VALIDATION_ERROR")
         self.filename = filename
@@ -54,7 +55,7 @@ class AnalysisError(RVToolsError):
         self,
         message: str,
         analysis_type: Optional[str] = None,
-        file_path: Optional[str] = None
+        file_path: Optional[str] = None,
     ):
         super().__init__(message, error_code="ANALYSIS_ERROR")
         self.analysis_type = analysis_type
@@ -73,7 +74,7 @@ class SKUDataError(RVToolsError):
         self,
         message: str,
         sku_name: Optional[str] = None,
-        operation: Optional[str] = None
+        operation: Optional[str] = None,
     ):
         super().__init__(message, error_code="SKU_DATA_ERROR")
         self.sku_name = sku_name
@@ -88,11 +89,7 @@ class SKUDataError(RVToolsError):
 class ConfigurationError(RVToolsError):
     """Raised when configuration is invalid."""
 
-    def __init__(
-        self,
-        message: str,
-        config_key: Optional[str] = None
-    ):
+    def __init__(self, message: str, config_key: Optional[str] = None):
         super().__init__(message, error_code="CONFIGURATION_ERROR")
         self.config_key = config_key
 
@@ -111,11 +108,7 @@ class ProtectedFileError(FileValidationError):
 class UnsupportedFileFormatError(FileValidationError):
     """Raised when file format is not supported."""
 
-    def __init__(
-        self,
-        message: str,
-        file_extension: Optional[str] = None
-    ):
+    def __init__(self, message: str, file_extension: Optional[str] = None):
         super().__init__(message)
         self.error_code = "UNSUPPORTED_FORMAT_ERROR"
         self.file_extension = file_extension
@@ -127,11 +120,7 @@ class UnsupportedFileFormatError(FileValidationError):
 class InsufficientDataError(AnalysisError):
     """Raised when there's insufficient data for analysis."""
 
-    def __init__(
-        self,
-        message: str,
-        missing_sheets: Optional[list] = None
-    ):
+    def __init__(self, message: str, missing_sheets: Optional[list] = None):
         super().__init__(message)
         self.error_code = "INSUFFICIENT_DATA_ERROR"
         self.missing_sheets = missing_sheets or []
@@ -147,7 +136,7 @@ class TemporaryFileError(RVToolsError):
         self,
         message: str,
         file_path: Optional[str] = None,
-        operation: Optional[str] = None
+        operation: Optional[str] = None,
     ):
         super().__init__(message, error_code="TEMP_FILE_ERROR")
         self.file_path = file_path

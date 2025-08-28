@@ -1,6 +1,7 @@
 """
 Configuration management for AVS RVTools Analyzer.
 """
+
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Set
@@ -9,6 +10,7 @@ from typing import Dict, List, Set
 @dataclass
 class ServerConfig:
     """Server configuration settings."""
+
     host: str = "127.0.0.1"
     port: int = 8000
     log_level: str = "info"
@@ -18,23 +20,33 @@ class ServerConfig:
 @dataclass
 class FastAPIConfig:
     """FastAPI application configuration."""
+
     title: str = "AVS RVTools Analyzer"
-    description: str = "A comprehensive tool for analyzing RVTools data with both web interface and RESTful API. Supports Model Context Protocol (MCP) for AI tool integration."
-    tags_metadata: List[Dict[str, str]] = field(default_factory=lambda: [
-        {
-            "name": "Web UI",
-            "description": "Web-based user interface for uploading, exploring, and analyzing RVTools files through an interactive dashboard."
-        },
-        {
-            "name": "API",
-            "description": "RESTful API endpoints for programmatic access, automation, and AI tool integration via Model Context Protocol (MCP)."
-        }
-    ])
+    description: str = (
+        "A comprehensive tool for analyzing RVTools data with both web interface and RESTful API. Supports Model Context Protocol (MCP) for AI tool integration."
+    )
+    tags_metadata: List[Dict[str, str]] = field(
+        default_factory=lambda: [
+            {
+                "name": "Web UI",
+                "description": (
+                    "Web-based user interface for uploading, exploring, and analyzing RVTools files through an interactive dashboard."
+                ),
+            },
+            {
+                "name": "API",
+                "description": (
+                    "RESTful API endpoints for programmatic access, automation, and AI tool integration via Model Context Protocol (MCP)."
+                ),
+            },
+        ]
+    )
 
 
 @dataclass
 class CORSConfig:
     """CORS middleware configuration."""
+
     allow_origins: List[str] = field(default_factory=lambda: ["*"])
     allow_credentials: bool = True
     allow_methods: List[str] = field(default_factory=lambda: ["*"])
@@ -44,6 +56,7 @@ class CORSConfig:
 @dataclass
 class FileConfig:
     """File handling configuration."""
+
     allowed_extensions: Set[str] = field(default_factory=lambda: {"xlsx", "xls"})
     max_file_size: int = 100 * 1024 * 1024  # 100MB
     temp_file_suffix: str = ".xlsx"
@@ -52,6 +65,7 @@ class FileConfig:
 @dataclass
 class PathConfig:
     """Path configuration for application directories."""
+
     base_dir: Path = field(default_factory=lambda: Path(__file__).parent)
 
     @property
@@ -70,6 +84,7 @@ class PathConfig:
 @dataclass
 class APIEndpointsConfig:
     """API endpoints configuration."""
+
     web_ui: str = "/"
     analyze: str = "/api/analyze"
     analyze_upload: str = "/api/analyze-upload"
@@ -85,6 +100,7 @@ class APIEndpointsConfig:
 @dataclass
 class MCPConfig:
     """MCP (Model Context Protocol) configuration."""
+
     name: str = "AVS RVTools Analyzer"
     mount_path: str = "/mcp"
 
@@ -94,12 +110,14 @@ class MigrationMethodsConfig:
     """Configuration for migration methods and their minimum hardware version requirements."""
 
     # Migration methods with their minimum required HW version
-    migration_methods: Dict[str, int] = field(default_factory=lambda: {
-        "HCX vMotion": 9,
-        "Cold Migration": 9,
-        "Replication Assisted vMotion": 9,
-        "Bulk Migration": 7
-    })
+    migration_methods: Dict[str, int] = field(
+        default_factory=lambda: {
+            "HCX vMotion": 9,
+            "Cold Migration": 9,
+            "Replication Assisted vMotion": 9,
+            "Bulk Migration": 7,
+        }
+    )
 
     # Special handling for very old versions
     minimum_supported_hw_version: int = 7
@@ -109,6 +127,7 @@ class MigrationMethodsConfig:
 @dataclass
 class AppConfig:
     """Main application configuration container."""
+
     server: ServerConfig = field(default_factory=ServerConfig)
     fastapi: FastAPIConfig = field(default_factory=FastAPIConfig)
     cors: CORSConfig = field(default_factory=CORSConfig)

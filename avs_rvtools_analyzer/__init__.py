@@ -15,10 +15,13 @@ def _get_version():
     except Exception:
         return "unknown"
 
+
 __version__ = _get_version()
+
 
 # For uv tool execution
 def main():
     """Entry point for uv tool execution."""
     from avs_rvtools_analyzer.main import main as app_main
+
     app_main()

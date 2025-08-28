@@ -1,6 +1,7 @@
 """
 Web UI routes for AVS RVTools Analyzer.
 """
+
 import json
 from typing import Any
 
@@ -14,11 +15,7 @@ from ..services import AnalysisService, FileService
 
 
 def setup_web_routes(
-    app: FastAPI,
-    templates: Jinja2Templates,
-    config: AppConfig,
-    host: str,
-    port: int
+    app: FastAPI, templates: Jinja2Templates, config: AppConfig, host: str, port: int
 ) -> None:
     """Setup web UI routes for the FastAPI application."""
 
@@ -26,7 +23,13 @@ def setup_web_routes(
     file_service = FileService(config.files)
     analysis_service = AnalysisService()
 
-    @app.get("/", response_class=HTMLResponse, tags=["Web UI"], summary="Landing Page", description="Main web interface for RVTools analysis")
+    @app.get(
+        "/",
+        response_class=HTMLResponse,
+        tags=["Web UI"],
+        summary="Landing Page",
+        description="Main web interface for RVTools analysis",
+    )
     async def index(request: Request):
         """Enhanced landing page with API links using configuration."""
         return templates.TemplateResponse(
@@ -36,12 +39,18 @@ def setup_web_routes(
                 "api_info": {
                     "host": host,
                     "port": port,
-                    "endpoints": config.get_endpoint_urls(host, port)
+                    "endpoints": config.get_endpoint_urls(host, port),
                 }
-            }
+            },
         )
 
-    @app.post("/explore", response_class=HTMLResponse, tags=["Web UI"], summary="Explore RVTools File", description="Upload and explore RVTools Excel file contents")
+    @app.post(
+        "/explore",
+        response_class=HTMLResponse,
+        tags=["Web UI"],
+        summary="Explore RVTools File",
+        description="Upload and explore RVTools Excel file contents",
+    )
     async def explore_file(request: Request, file: UploadFile = File(...)):
         """Upload and explore RVTools Excel file contents."""
         try:
@@ -57,20 +66,21 @@ def setup_web_routes(
             return templates.TemplateResponse(
                 request=request,
                 name="explore.html",
-                context={
-                    "sheets": sheets,
-                    "filename": file.filename
-                }
+                context={"sheets": sheets, "filename": file.filename},
             )
 
         except Exception as e:
             return templates.TemplateResponse(
-                request=request,
-                name="error.html",
-                context={"message": str(e)}
+                request=request, name="error.html", context={"message": str(e)}
             )
 
-    @app.post("/analyze", response_class=HTMLResponse, tags=["Web UI"], summary="Analyze Migration Risks", description="Upload and analyze RVTools file for migration risks and compatibility issues")
+    @app.post(
+        "/analyze",
+        response_class=HTMLResponse,
+        tags=["Web UI"],
+        summary="Analyze Migration Risks",
+        description="Upload and analyze RVTools file for migration risks and compatibility issues",
+    )
     async def analyze_migration_risks(request: Request, file: UploadFile = File(...)):
         """Upload and analyze RVTools file for migration risks and compatibility issues."""
         try:
@@ -85,9 +95,7 @@ def setup_web_routes(
 
             # Perform risk analysis
             risk_results = analysis_service.analyze_risks(
-                excel_data,
-                include_details=True,
-                filter_zero_counts=True
+                excel_data, include_details=True, filter_zero_counts=True
             )
 
             return templates.TemplateResponse(
@@ -96,17 +104,20 @@ def setup_web_routes(
                 context={
                     "filename": file.filename,
                     "risk_results": risk_results,
-                }
+                },
             )
 
         except Exception as e:
             return templates.TemplateResponse(
-                request=request,
-                name="error.html",
-                context={"message": str(e)}
+                request=request, name="error.html", context={"message": str(e)}
             )
 
-    @app.post("/convert-to-json", tags=["Web UI"], summary="Convert to JSON", description="Upload and convert RVTools Excel file to JSON format for download")
+    @app.post(
+        "/convert-to-json",
+        tags=["Web UI"],
+        summary="Convert to JSON",
+        description="Upload and convert RVTools Excel file to JSON format for download",
+    )
     async def convert_to_json(request: Request, file: UploadFile = File(...)):
         """Upload and convert RVTools Excel file to JSON format for download."""
         try:
@@ -120,24 +131,33 @@ def setup_web_routes(
             json_result = {}
             for sheet_name, sheet_info in excel_data.items():
                 # Get the data from the sheet
-                sheet_data = sheet_info.get('data', [])
+                sheet_data = sheet_info.get("data", [])
 
                 # Remove rows where all values are None/empty
                 filtered_data = []
                 for row in sheet_data:
-                    if any(value is not None and str(value).strip() != '' for value in row.values()):
+                    if any(
+                        value is not None and str(value).strip() != ""
+                        for value in row.values()
+                    ):
                         # Clean each value for JSON serialization
-                        cleaned_row = {k: clean_value_for_json(v) for k, v in row.items()}
+                        cleaned_row = {
+                            k: clean_value_for_json(v) for k, v in row.items()
+                        }
                         filtered_data.append(cleaned_row)
 
                 # Store only the data for this sheet
                 json_result[sheet_name] = filtered_data
 
             # Convert to JSON string with nice formatting
-            json_content = json.dumps(json_result, indent=2, ensure_ascii=False, default=json_serializer)
+            json_content = json.dumps(
+                json_result, indent=2, ensure_ascii=False, default=json_serializer
+            )
 
             # Create filename based on original file
-            original_name = file.filename.rsplit('.', 1)[0] if file.filename else 'rvtools_export'
+            original_name = (
+                file.filename.rsplit(".", 1)[0] if file.filename else "rvtools_export"
+            )
             json_filename = f"{original_name}.json"
 
             # Return as downloadable JSON file
@@ -146,12 +166,10 @@ def setup_web_routes(
                 media_type="application/json",
                 headers={
                     "Content-Disposition": f"attachment; filename={json_filename}"
-                }
+                },
             )
 
         except Exception as e:
             return templates.TemplateResponse(
-                request=request,
-                name="error.html",
-                context={"message": str(e)}
+                request=request, name="error.html", context={"message": str(e)}
             )

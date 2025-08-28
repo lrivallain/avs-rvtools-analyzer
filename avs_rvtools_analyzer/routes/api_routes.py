@@ -2,6 +2,7 @@
 API and MCP routes for AVS RVTools Analyzer.
 Combines both REST API endpoints and MCP tool definitions.
 """
+
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -13,48 +14,68 @@ from pydantic import BaseModel, Field
 from .. import __version__ as calver_version
 from ..config import AppConfig
 from ..helpers import clean_value_for_json
-from ..models import (AnalysisResponse, APIInfoResponse,
-                      AvailableRisksResponse, ErrorResponse, ExcelSheetInfo,
-                      ExcelToJsonResponse, HealthResponse, RiskTypeInfo,
-                      SKUCapabilitiesResponse, SKUInfo)
+from ..models import (
+    AnalysisResponse,
+    APIInfoResponse,
+    AvailableRisksResponse,
+    ErrorResponse,
+    ExcelSheetInfo,
+    ExcelToJsonResponse,
+    HealthResponse,
+    RiskTypeInfo,
+    SKUCapabilitiesResponse,
+    SKUInfo,
+)
 from ..services import AnalysisService, FileService, SKUService
 
 
 class AnalyzeFileRequest(BaseModel):
     """Request model for file analysis."""
+
     file_path: str
     include_details: Optional[bool] = False
 
 
 class AnalyzeJsonRequest(BaseModel):
     """Request model for JSON data analysis."""
-    data: Dict[str, List[Dict[str, Any]]] = Field(description="JSON data organized by sheet name")
-    include_details: Optional[bool] = Field(default=False, description="Include detailed analysis results")
+
+    data: Dict[str, List[Dict[str, Any]]] = Field(
+        description="JSON data organized by sheet name"
+    )
+    include_details: Optional[bool] = Field(
+        default=False, description="Include detailed analysis results"
+    )
 
     model_config = {
         "json_schema_extra": {
             "example": {
                 "data": {
                     "vInfo": [
-                        {"VM": "VM-001", "Power": "poweredOn", "CPUs": 4, "Memory": 8192},
-                        {"VM": "VM-002", "Power": "poweredOff", "CPUs": 2, "Memory": 4096}
+                        {
+                            "VM": "VM-001",
+                            "Power": "poweredOn",
+                            "CPUs": 4,
+                            "Memory": 8192,
+                        },
+                        {
+                            "VM": "VM-002",
+                            "Power": "poweredOff",
+                            "CPUs": 2,
+                            "Memory": 4096,
+                        },
                     ],
                     "vCPU": [
                         {"VM": "VM-001", "CPU Usage": "25%"},
-                        {"VM": "VM-002", "CPU Usage": "0%"}
-                    ]
+                        {"VM": "VM-002", "CPU Usage": "0%"},
+                    ],
                 },
-                "include_details": False
+                "include_details": False,
             }
         }
     }
 
 
-def setup_api_routes(
-    app: FastAPI,
-    mcp: FastMCP,
-    config: AppConfig
-) -> None:
+def setup_api_routes(app: FastAPI, mcp: FastMCP, config: AppConfig) -> None:
     """Setup API and MCP routes for the FastAPI application."""
 
     # Initialize services
@@ -63,7 +84,13 @@ def setup_api_routes(
     sku_service = SKUService(config.paths.sku_data_file)
 
     # API Routes
-    @app.get("/api/info", tags=["API"], summary="Server Information", description="Get server information and available endpoints", response_model=APIInfoResponse)
+    @app.get(
+        "/api/info",
+        tags=["API"],
+        summary="Server Information",
+        description="Get server information and available endpoints",
+        response_model=APIInfoResponse,
+    )
     async def api_info():
         """Get server information and available endpoints."""
         return APIInfoResponse(
@@ -82,25 +109,37 @@ def setup_api_routes(
                 "available_risks": config.endpoints.available_risks,
                 "sku_capabilities": config.endpoints.sku_capabilities,
                 "health": config.endpoints.health,
-            }
+            },
         )
 
-    @app.get("/health", tags=["API"], summary="Health Check", description="Check server health status", response_model=HealthResponse)
+    @app.get(
+        "/health",
+        tags=["API"],
+        summary="Health Check",
+        description="Check server health status",
+        response_model=HealthResponse,
+    )
     async def health():
         """Check server health status."""
         return HealthResponse(
             status="healthy",
             timestamp=datetime.now(UTC).isoformat() + "Z",
-            version=calver_version
+            version=calver_version,
         )
 
     # Combined API/MCP Routes
     @mcp.tool(
         name="list_available_risks",
         description="List all migration risks that can be assessed by this tool.",
-        tags={"risks", "assessment"}
+        tags={"risks", "assessment"},
     )
-    @app.get("/api/risks", tags=["API"], summary="Available Risk Assessments", description="List all migration risks that can be assessed by this tool", response_model=AvailableRisksResponse)
+    @app.get(
+        "/api/risks",
+        tags=["API"],
+        summary="Available Risk Assessments",
+        description="List all migration risks that can be assessed by this tool",
+        response_model=AvailableRisksResponse,
+    )
     async def list_available_risks():
         """Get information about all available risk detection capabilities."""
         risks_info = analysis_service.get_available_risk_types()
@@ -108,28 +147,36 @@ def setup_api_routes(
         # Transform the risks data to match our response model
         risk_types = []
         for risk_name, risk_data in risks_info.get("risks", {}).items():
-            risk_types.append(RiskTypeInfo(
-                name=risk_name,
-                function_name=risk_data.get("function_name", risk_name),
-                description=risk_data.get("description", ""),
-                risk_level=risk_data.get("risk_level", "info"),
-                alert_message=risk_data.get("alert_message"),
-                category=risk_data.get("category")
-            ))
+            risk_types.append(
+                RiskTypeInfo(
+                    name=risk_name,
+                    function_name=risk_data.get("function_name", risk_name),
+                    description=risk_data.get("description", ""),
+                    risk_level=risk_data.get("risk_level", "info"),
+                    alert_message=risk_data.get("alert_message"),
+                    category=risk_data.get("category"),
+                )
+            )
 
         return AvailableRisksResponse(
             success=True,
             message=f"Found {len(risk_types)} available risk assessments",
             total_risks=len(risk_types),
-            risks=risk_types
+            risks=risk_types,
         )
 
     @mcp.tool(
         name="get_sku_capabilities",
         description="Get Azure VMware Solution (AVS) SKU hardware capabilities and specifications.",
-        tags={"sku", "hardware", "capabilities"}
+        tags={"sku", "hardware", "capabilities"},
     )
-    @app.get("/api/sku", tags=["API"], summary="AVS SKU Capabilities", description="Get Azure VMware Solution (AVS) SKU hardware capabilities and specifications", response_model=SKUCapabilitiesResponse)
+    @app.get(
+        "/api/sku",
+        tags=["API"],
+        summary="AVS SKU Capabilities",
+        description="Get Azure VMware Solution (AVS) SKU hardware capabilities and specifications",
+        response_model=SKUCapabilitiesResponse,
+    )
     async def get_sku_capabilities():
         """Get AVS SKU hardware capabilities and specifications."""
         sku_data = sku_service.get_sku_capabilities()
@@ -144,9 +191,15 @@ def setup_api_routes(
     @mcp.tool(
         name="analyze_file",
         description="Analyze RVTools file by providing a file path on the server.",
-        tags={"analysis", "file", "local"}
+        tags={"analysis", "file", "local"},
     )
-    @app.post("/api/analyze", tags=["API"], summary="Analyze RVTools File (Path)", description="Analyze RVTools file by providing a file path on the server", response_model=AnalysisResponse)
+    @app.post(
+        "/api/analyze",
+        tags=["API"],
+        summary="Analyze RVTools File (Path)",
+        description="Analyze RVTools file by providing a file path on the server",
+        response_model=AnalysisResponse,
+    )
     async def analyze_file(request: AnalyzeFileRequest):
         """Analyze RVTools file by file path."""
         file_path = Path(request.file_path)
@@ -159,9 +212,7 @@ def setup_api_routes(
 
         # Perform analysis
         result = analysis_service.analyze_risks(
-            excel_data,
-            include_details=request.include_details,
-            filter_zero_counts=True
+            excel_data, include_details=request.include_details, filter_zero_counts=True
         )
 
         return AnalysisResponse(
@@ -169,19 +220,26 @@ def setup_api_routes(
             message="Analysis completed successfully",
             risks=result.get("risks", {}),
             summary=result.get("summary"),
-            total_risks_found=len([r for r in result.get("risks", {}).values() if r.get("count", 0) > 0]),
-            analysis_timestamp=datetime.now(UTC).isoformat() + "Z"
+            total_risks_found=len(
+                [r for r in result.get("risks", {}).values() if r.get("count", 0) > 0]
+            ),
+            analysis_timestamp=datetime.now(UTC).isoformat() + "Z",
         )
 
     @mcp.tool(
         name="analyze_uploaded_file",
         description="Upload and analyze RVTools Excel file for migration risks and compatibility issues.",
-        tags={"analysis", "upload"}
+        tags={"analysis", "upload"},
     )
-    @app.post("/api/analyze-upload", tags=["API"], summary="Analyze RVTools File (Upload)", description="Upload and analyze RVTools Excel file for migration risks and compatibility issues", response_model=AnalysisResponse)
+    @app.post(
+        "/api/analyze-upload",
+        tags=["API"],
+        summary="Analyze RVTools File (Upload)",
+        description="Upload and analyze RVTools Excel file for migration risks and compatibility issues",
+        response_model=AnalysisResponse,
+    )
     async def analyze_uploaded_file(
-        file: UploadFile = File(...),
-        include_details: bool = Form(False)
+        file: UploadFile = File(...), include_details: bool = Form(False)
     ):
         """Analyze uploaded RVTools file."""
         # Validate file
@@ -195,9 +253,7 @@ def setup_api_routes(
 
         # Perform analysis
         result = analysis_service.analyze_risks(
-            excel_data,
-            include_details=include_details,
-            filter_zero_counts=True
+            excel_data, include_details=include_details, filter_zero_counts=True
         )
 
         return AnalysisResponse(
@@ -205,16 +261,24 @@ def setup_api_routes(
             message="Analysis completed successfully",
             risks=result.get("risks", {}),
             summary=result.get("summary"),
-            total_risks_found=len([r for r in result.get("risks", {}).values() if r.get("count", 0) > 0]),
-            analysis_timestamp=datetime.now(UTC).isoformat() + "Z"
+            total_risks_found=len(
+                [r for r in result.get("risks", {}).values() if r.get("count", 0) > 0]
+            ),
+            analysis_timestamp=datetime.now(UTC).isoformat() + "Z",
         )
 
     @mcp.tool(
         name="analyze_json_data",
         description="Analyze JSON data for migration risks and compatibility issues.",
-        tags={"analysis", "json"}
+        tags={"analysis", "json"},
     )
-    @app.post("/api/analyze-json", tags=["API"], summary="Analyze JSON Data", description="Analyze JSON data (e.g., from converted Excel) for migration risks and compatibility issues", response_model=AnalysisResponse)
+    @app.post(
+        "/api/analyze-json",
+        tags=["API"],
+        summary="Analyze JSON Data",
+        description="Analyze JSON data (e.g., from converted Excel) for migration risks and compatibility issues",
+        response_model=AnalysisResponse,
+    )
     async def analyze_json_data(request: AnalyzeJsonRequest):
         """Analyze JSON data for migration risks."""
         try:
@@ -226,9 +290,9 @@ def setup_api_routes(
                 headers = list(sheet_data[0].keys()) if sheet_data else []
 
                 excel_data[sheet_name] = {
-                    'headers': headers,
-                    'data': sheet_data,
-                    'row_count': len(sheet_data)
+                    "headers": headers,
+                    "data": sheet_data,
+                    "row_count": len(sheet_data),
                 }
 
             # Validate Excel data
@@ -238,7 +302,7 @@ def setup_api_routes(
             result = analysis_service.analyze_risks(
                 excel_data,
                 include_details=request.include_details,
-                filter_zero_counts=True
+                filter_zero_counts=True,
             )
 
             return AnalysisResponse(
@@ -246,26 +310,36 @@ def setup_api_routes(
                 message="JSON data analysis completed successfully",
                 risks=result.get("risks", {}),
                 summary=result.get("summary"),
-                total_risks_found=len([r for r in result.get("risks", {}).values() if r.get("count", 0) > 0]),
-                analysis_timestamp=datetime.now(UTC).isoformat() + "Z"
+                total_risks_found=len(
+                    [
+                        r
+                        for r in result.get("risks", {}).values()
+                        if r.get("count", 0) > 0
+                    ]
+                ),
+                analysis_timestamp=datetime.now(UTC).isoformat() + "Z",
             )
 
         except Exception as e:
             raise HTTPException(
-                status_code=500,
-                detail=f"Error analyzing JSON data: {str(e)}"
+                status_code=500, detail=f"Error analyzing JSON data: {str(e)}"
             )
 
     @mcp.tool(
         name="convert_excel_to_json",
         description="Convert Excel file to JSON format for AI model consumption.",
-        tags={"conversion", "json", "excel"}
+        tags={"conversion", "json", "excel"},
     )
-    @app.post("/api/convert-to-json", tags=["API"], summary="Convert Excel to JSON", description="Convert uploaded Excel file to JSON format for AI model analysis")
+    @app.post(
+        "/api/convert-to-json",
+        tags=["API"],
+        summary="Convert Excel to JSON",
+        description="Convert uploaded Excel file to JSON format for AI model analysis",
+    )
     async def convert_excel_to_json(
         file: UploadFile = File(...),
         include_empty_cells: bool = Form(False),
-        max_rows_per_sheet: Optional[int] = Form(1000)
+        max_rows_per_sheet: Optional[int] = Form(1000),
     ):
         """Convert Excel file to JSON format."""
         # Validate file
@@ -278,7 +352,7 @@ def setup_api_routes(
         json_result = {}
         for sheet_name, sheet_info in excel_data.items():
             # Get the data from the sheet
-            sheet_data = sheet_info.get('data', [])
+            sheet_data = sheet_info.get("data", [])
 
             # Limit rows if specified
             if max_rows_per_sheet and len(sheet_data) > max_rows_per_sheet:
@@ -289,9 +363,14 @@ def setup_api_routes(
                 # Remove rows where all values are None/empty
                 filtered_data = []
                 for row in sheet_data:
-                    if any(value is not None and str(value).strip() != '' for value in row.values()):
+                    if any(
+                        value is not None and str(value).strip() != ""
+                        for value in row.values()
+                    ):
                         # Clean each value for JSON serialization
-                        cleaned_row = {k: clean_value_for_json(v) for k, v in row.items()}
+                        cleaned_row = {
+                            k: clean_value_for_json(v) for k, v in row.items()
+                        }
                         filtered_data.append(cleaned_row)
                 sheet_data = filtered_data
             else:

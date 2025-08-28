@@ -14,22 +14,23 @@ class ColoredFormatter(logging.Formatter):
 
     # ANSI color codes
     COLORS = {
-        'DEBUG': '\033[36m',      # Cyan
-        'INFO': '\033[32m',       # Green
-        'WARNING': '\033[33m',    # Yellow
-        'ERROR': '\033[31m',      # Red
-        'CRITICAL': '\033[35m',   # Magenta
-        'RESET': '\033[0m'        # Reset
+        "DEBUG": "\033[36m",  # Cyan
+        "INFO": "\033[32m",  # Green
+        "WARNING": "\033[33m",  # Yellow
+        "ERROR": "\033[31m",  # Red
+        "CRITICAL": "\033[35m",  # Magenta
+        "RESET": "\033[0m",  # Reset
     }
 
     def format(self, record):
         # Get color for log level
-        color = self.COLORS.get(record.levelname, self.COLORS['RESET'])
-        reset = self.COLORS['RESET']
+        color = self.COLORS.get(record.levelname, self.COLORS["RESET"])
+        reset = self.COLORS["RESET"]
 
         # Format like uvicorn: "INFO:     message"
         formatted_level = f"{color}{record.levelname}{reset}:"
         return f"{formatted_level:<15}    {record.getMessage()}"
+
 
 def convert_mib_to_human_readable(value):
     """
@@ -55,32 +56,32 @@ def convert_mib_to_human_readable(value):
 def get_risk_badge_class(risk_level):
     """Map risk levels to Bootstrap badge classes."""
     risk_mapping = {
-        'info': 'text-bg-info',
-        'warning': 'text-bg-warning',
-        'danger': 'text-bg-danger',
-        'blocking': 'text-bg-danger',
-        'emergency': 'text-bg-dark'  # Black badge for emergency
+        "info": "text-bg-info",
+        "warning": "text-bg-warning",
+        "danger": "text-bg-danger",
+        "blocking": "text-bg-danger",
+        "emergency": "text-bg-dark",  # Black badge for emergency
     }
-    return risk_mapping.get(risk_level, 'text-bg-secondary')
+    return risk_mapping.get(risk_level, "text-bg-secondary")
 
 
 def get_risk_display_name(risk_level):
     """Map risk levels to display names."""
     risk_mapping = {
-        'info': 'Info',
-        'warning': 'Warning',
-        'danger': 'Blocking',
-        'blocking': 'Blocking',
-        'emergency': 'Emergency'
+        "info": "Info",
+        "warning": "Warning",
+        "danger": "Blocking",
+        "blocking": "Blocking",
+        "emergency": "Emergency",
     }
-    return risk_mapping.get(risk_level, 'Unknown')
+    return risk_mapping.get(risk_level, "Unknown")
 
 
 def allowed_file(filename, allowed_extensions=None):
     """Check if uploaded file has an allowed extension."""
     if allowed_extensions is None:
-        allowed_extensions = {'xlsx'}
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in allowed_extensions
+        allowed_extensions = {"xlsx"}
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in allowed_extensions
 
 
 def contains_password_reference(text):
@@ -98,12 +99,18 @@ def contains_password_reference(text):
 
     # Password patterns to search for (case-insensitive)
     password_patterns = [
-        r'\bpassword\b', r'\bpwd\b', r'\bpass\b', r'\bpasswd\b',
-        r'\bpassphrase\b', r'\bpasskey\b', r'\bsecret\b', r'\bcredential\b'
+        r"\bpassword\b",
+        r"\bpwd\b",
+        r"\bpass\b",
+        r"\bpasswd\b",
+        r"\bpassphrase\b",
+        r"\bpasskey\b",
+        r"\bsecret\b",
+        r"\bcredential\b",
     ]
 
     # Combine all patterns into a single regex
-    combined_pattern = '|'.join(password_patterns)
+    combined_pattern = "|".join(password_patterns)
     password_regex = re.compile(combined_pattern, re.IGNORECASE)
 
     return bool(password_regex.search(str(text)))
