@@ -53,6 +53,15 @@
     <div id="collapseAzureOpenAI" class="collapse">
         <div class="card-body">
             <p class="text-muted">Configure Azure OpenAI to get AI-powered suggestions for migration risks.</p>
+            
+            <!-- Disclaimer Message -->
+            <div class="alert alert-warning" role="alert">
+                <i class="fas fa-exclamation-triangle"></i> <strong>Disclaimer:</strong> 
+                AI-generated suggestions are for informational purposes only and should be thoroughly reviewed by qualified professionals. 
+                The tool maintainers cannot be held responsible for the accuracy or consequences of the provided suggestions. 
+                Always validate recommendations with your specific environment and requirements.
+            </div>
+            
             <form id="azure-openai-form">
                 <div class="row">
                     <div class="col-md-6">
@@ -592,14 +601,8 @@
         const suggestionContent = document.getElementById(`ai-suggestion-content-${riskName}`);
         
         if (suggestionArea && suggestionContent) {
-            // Convert plain text to HTML with basic formatting
-            const formattedSuggestion = suggestion
-                .replace(/\n\n/g, '</p><p>')
-                .replace(/\n/g, '<br>')
-                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                .replace(/\*(.*?)\*/g, '<em>$1</em>');
-            
-            suggestionContent.innerHTML = `<p>${formattedSuggestion}</p>`;
+            // AI now returns HTML content directly, no transformation needed
+            suggestionContent.innerHTML = suggestion;
             suggestionArea.style.display = '';
             
             // Scroll to the suggestion

@@ -134,13 +134,18 @@ class AzureOpenAIService:
 {self._format_risk_data_for_prompt(sample_data)}
 
 ## Request
-Please provide:
+Please provide a comprehensive analysis in HTML format with the following sections:
 1. **Impact Assessment**: How this risk affects Azure VMware Solution migration
 2. **Recommended Actions**: Specific steps to mitigate this risk
 3. **Migration Strategy**: How to handle these items during migration
 4. **Timeline Considerations**: When to address this risk in the migration process
 
-Please be concise, practical, and specific to Azure VMware Solution migration requirements.
+**Output Requirements:**
+- Generate HTML markup directly (no markdown)
+- Use heading levels h5 and below only (h5, h6)
+- Include proper HTML tags for paragraphs, lists, and emphasis
+- Be concise, practical, and specific to Azure VMware Solution migration requirements
+- Do not include any HTML document structure (html, head, body tags)
 """
         return prompt
 
