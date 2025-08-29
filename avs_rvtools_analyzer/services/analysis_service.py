@@ -153,6 +153,8 @@ class AnalysisService:
             return None
         elif pd.isna(obj):
             return None
+        elif hasattr(obj, "isoformat"):  # Handle pandas Timestamp and datetime objects
+            return obj.isoformat()
         else:
             return obj
 

@@ -408,45 +408,46 @@ def setup_api_routes(app: FastAPI, mcp: FastMCP, config: AppConfig) -> None:
         try:
             # Debug logging
             logger.debug(f"AI suggestion request for risk: {request.risk_name}")
-            logger.debug(f"Risk data count: {len(request.risk_data) if request.risk_data else 0}")
-            logger.debug(f"Risk data sample: {request.risk_data[:3] if request.risk_data and len(request.risk_data) > 0 else 'Empty or None'}")
-            
+            logger.debug(
+                f"Risk data count: {len(request.risk_data) if request.risk_data else 0}"
+            )
+            logger.debug(
+                f"Risk data sample: {request.risk_data[:3] if request.risk_data and len(request.risk_data) > 0 else 'Empty or None'}"
+            )
+
             # Check if Azure OpenAI is configured via environment variables
             if not azure_openai_service.is_configured:
                 return AISuggestionResponse(
                     success=False,
                     error="Azure OpenAI not configured via environment variables",
-                    risk_name=request.risk_name
+                    risk_name=request.risk_name,
                 )
-            
+
             # Get AI suggestion
             suggestion = azure_openai_service.get_risk_analysis_suggestion(
                 risk_name=request.risk_name,
                 risk_description=request.risk_description,
                 risk_data=request.risk_data,
-                risk_level=request.risk_level
+                risk_level=request.risk_level,
             )
-            
+
             if suggestion:
                 return AISuggestionResponse(
-                    success=True,
-                    suggestion=suggestion,
-                    risk_name=request.risk_name
+                    success=True, suggestion=suggestion, risk_name=request.risk_name
                 )
             else:
                 return AISuggestionResponse(
                     success=False,
                     error="Failed to generate AI suggestion",
-                    risk_name=request.risk_name
+                    risk_name=request.risk_name,
                 )
-                
+
         except Exception as e:
             return AISuggestionResponse(
                 success=False,
                 error=f"Error generating AI suggestion: {str(e)}",
-                risk_name=request.risk_name
+                risk_name=request.risk_name,
             )
-
 
     @app.get(
         "/api/azure-openai-status",
@@ -461,10 +462,7 @@ def setup_api_routes(app: FastAPI, mcp: FastMCP, config: AppConfig) -> None:
             status = azure_openai_service.get_configuration_status()
             return AzureOpenAIStatusResponse(
                 is_configured=status["is_configured"],
-                deployment_name=status["deployment_name"]
+                deployment_name=status["deployment_name"],
             )
         except Exception as e:
-            return AzureOpenAIStatusResponse(
-                is_configured=False,
-                deployment_name=None
-            )
+            return AzureOpenAIStatusResponse(is_configured=False, deployment_name=None)

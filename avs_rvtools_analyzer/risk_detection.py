@@ -274,11 +274,18 @@ def detect_snapshots(excel_data: pd.ExcelFile) -> Dict[str, Any]:
     # Process snapshots and redact any descriptions containing passwords
     snapshots = []
     for _, row in vsnapshot_sheet.iterrows():
+        # Convert date/time to string if it's a pandas Timestamp
+        date_time_value = row.get("Date / time", "")
+        if hasattr(date_time_value, "isoformat"):
+            date_time_value = date_time_value.isoformat()
+        elif date_time_value and date_time_value != "":
+            date_time_value = str(date_time_value)
+
         snapshot_data = {
             "VM": row.get("VM", ""),
             "Powerstate": row.get("Powerstate", ""),
             "Name": row.get("Name", ""),
-            "Date / time": row.get("Date / time", ""),
+            "Date / time": date_time_value,
             "Size MiB (vmsn)": row.get("Size MiB (vmsn)", ""),
             "Description": redact_password_content(row.get("Description", "")),
         }
