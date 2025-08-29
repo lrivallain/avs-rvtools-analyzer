@@ -64,6 +64,8 @@ jobs:
     name: Create GitHub Release
     runs-on: ubuntu-latest
     needs: [test]
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout code
@@ -83,16 +85,16 @@ jobs:
         run: |
           CURRENT_TAG=${GITHUB_REF#refs/tags/}
           PREV_TAG="${{ steps.prev-tag.outputs.prev-tag }}"
-          
+
           echo "## What's Changed" > changelog.md
           echo "" >> changelog.md
-          
+
           if [ -n "$PREV_TAG" ]; then
             # Get commits between tags
             git log --oneline --no-merges "${PREV_TAG}..${CURRENT_TAG}" | while read line; do
               echo "- $line" >> changelog.md
             done
-            
+
             # Get merged PRs (if any)
             echo "" >> changelog.md
             echo "### Merged Pull Requests" >> changelog.md
@@ -100,7 +102,7 @@ jobs:
           else
             echo "- Initial release" >> changelog.md
           fi
-          
+
           echo "" >> changelog.md
           echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG}...${CURRENT_TAG}" >> changelog.md
 
