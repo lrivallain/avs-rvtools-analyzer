@@ -3,6 +3,7 @@ API and MCP routes for AVS RVTools Analyzer.
 Combines both REST API endpoints and MCP tool definitions.
 """
 
+import logging
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -31,6 +32,8 @@ from ..models import (
 )
 from ..services import AnalysisService, FileService, SKUService
 from ..services.azure_openai_service import AzureOpenAIService
+
+logger = logging.getLogger(__name__)
 
 
 class AnalyzeFileRequest(BaseModel):
@@ -403,6 +406,11 @@ def setup_api_routes(app: FastAPI, mcp: FastMCP, config: AppConfig) -> None:
     async def get_ai_suggestion(request: AISuggestionRequest):
         """Get AI-powered suggestions for a specific migration risk."""
         try:
+            # Debug logging
+            logger.info(f"AI suggestion request for risk: {request.risk_name}")
+            logger.info(f"Risk data count: {len(request.risk_data) if request.risk_data else 0}")
+            logger.info(f"Risk data sample: {request.risk_data[:3] if request.risk_data and len(request.risk_data) > 0 else 'Empty or None'}")
+            
             # Check if Azure OpenAI is configured via environment variables
             if not azure_openai_service.is_configured:
                 return AISuggestionResponse(

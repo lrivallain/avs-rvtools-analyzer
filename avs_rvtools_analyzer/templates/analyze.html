@@ -469,8 +469,11 @@
         let riskData;
         try {
             riskData = JSON.parse(riskDataStr);
+            console.log('Parsed risk data:', riskData);
+            console.log('Risk data length:', riskData ? riskData.length : 'null');
         } catch (e) {
             console.error('Error parsing risk data:', e);
+            console.error('Risk data string:', riskDataStr);
             riskData = [];
         }
 
