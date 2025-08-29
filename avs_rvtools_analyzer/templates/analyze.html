@@ -41,6 +41,14 @@
     </div>
 </div>
 
+<!-- Azure OpenAI Disclaimer - Visible when AI is configured via environment variables -->
+<div class="alert alert-warning ai-disclaimer" role="alert" style="display: none;">
+    <i class="fas fa-exclamation-triangle"></i> <strong>Disclaimer:</strong> 
+    AI-generated suggestions are for informational purposes only and should be thoroughly reviewed by qualified professionals. 
+    The tool maintainers cannot be held responsible for the accuracy or consequences of the provided suggestions. 
+    Always validate recommendations with your specific environment and requirements.
+</div>
+
 <!-- Risk Detail Cards -->
 {% set risk_order = ['emergency', 'blocking', 'danger', 'warning', 'info'] %}
 {% for risk_level in risk_order %}
@@ -49,9 +57,19 @@
             <div class="card mb-4" id="{{ risk_name }}-card" data-risk-level="{{ risk_data.risk_level }}">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h2>{{ risk_name.replace('detect_', '').replace('_', ' ').title() }}</h2>
-                    <button class="btn btn-primary" data-id="{{ risk_name }}-table" onclick="downloadTableAsCSV(this)">
-                        <i class="fas fa-download"></i> Download CSV
-                    </button>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-outline-success ai-suggestion-btn" 
+                                data-risk-name="{{ risk_name }}" 
+                                data-risk-description="{{ risk_data.risk_info.description if risk_data.risk_info else '' }}"
+                                data-risk-level="{{ risk_data.risk_level }}"
+                                onclick="getAISuggestion(this)"
+                                style="display: none;">
+                            <i class="fas fa-robot"></i> AI Suggestion
+                        </button>
+                        <button class="btn btn-primary" data-id="{{ risk_name }}-table" onclick="downloadTableAsCSV(this)">
+                            <i class="fas fa-download"></i> Download CSV
+                        </button>
+                    </div>
                 </div>
             <div class="card-body">
                 {% if risk_data.risk_info %}
@@ -63,6 +81,19 @@
                         {{ risk_data.risk_info.alert_message | safe }}
                     </div>
                     {% endif %}
+                
+                    <!-- AI Suggestion Area -->
+                    <div id="ai-suggestion-{{ risk_name }}" class="ai-suggestion-area" style="display: none;">
+                        <div class="alert alert-info">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <h6 class="alert-heading"><i class="fas fa-robot"></i> AI Analysis & Recommendations</h6>
+                                    <div id="ai-suggestion-content-{{ risk_name }}"></div>
+                                </div>
+                                <button type="button" class="btn-close" onclick="hideAISuggestion('{{ risk_name }}')" aria-label="Close"></button>
+                            </div>
+                        </div>
+                    </div>
                 {% endif %}                <!-- Generic table for all risk types -->
                 {% if risk_data.data %}
                     <table class="table table-striped resizable-table" id="{{ risk_name }}-table">
@@ -190,9 +221,43 @@
         white-space: normal;
         word-break: break-word;
     }
+
+    /* Azure OpenAI Integration Styles */
+    .ai-suggestion-area {
+        margin-bottom: 1rem;
+    }
+
+    .ai-suggestion-btn {
+        min-width: 140px;
+    }
+
+    #azure-openai-config .btn-link {
+        text-decoration: none;
+        color: #0d6efd;
+        padding: 0;
+    }
+
+    #azure-openai-config .btn-link:hover {
+        color: #0a58ca;
+    }
+
+    .ai-suggestion-area .alert {
+        margin-bottom: 0;
+    }
+
+    .ai-suggestion-area .alert-heading {
+        margin-bottom: 1rem;
+    }
 </style>
 
 <script>
+    // Store risk data globally to avoid HTML attribute size limits
+    const riskDataStore = {
+        {% for risk_name, risk_data in risk_results.risks.items() %}
+        "{{ risk_name }}": {{ risk_data.data | tojson | safe }},
+        {% endfor %}
+    };
+
     function downloadTableAsCSV(button) {
         const tableId = button.getAttribute('data-id');
         const table = document.getElementById(tableId);
@@ -297,6 +362,9 @@
     document.addEventListener('DOMContentLoaded', function() {
         makeTablesResizable();
 
+        // Check Azure OpenAI configuration status
+        checkAzureOpenAIStatus();
+
         // Check for emergency risks and show warning popup
         checkForEmergencyRisks();
     });
@@ -362,6 +430,111 @@
         document.getElementById('emergencyWarningModal').addEventListener('hidden.bs.modal', function () {
             this.remove();
         });
+    }
+
+    // Azure OpenAI Integration Functions
+    let azureOpenAIConfigured = false;
+
+    function checkAzureOpenAIStatus() {
+        fetch('/api/azure-openai-status')
+        .then(response => response.json())
+        .then(data => {
+            if (data.is_configured) {
+                azureOpenAIConfigured = true;
+                
+                // Show disclaimer when AI is configured via environment variables
+                document.querySelector('.ai-disclaimer').style.display = 'block';
+                
+                // Show AI suggestion buttons
+                document.querySelectorAll('.ai-suggestion-btn').forEach(btn => {
+                    btn.style.display = '';
+                });
+                
+                console.log('Azure OpenAI configured via environment variables');
+            }
+        })
+        .catch(error => {
+            console.log('Azure OpenAI status check failed:', error);
+            // Silently fail - this just means OpenAI is not available
+        });
+    }
+
+
+
+    function getAISuggestion(button) {
+        if (!azureOpenAIConfigured) {
+            showStatusMessage('Azure OpenAI is not configured via environment variables.', 'warning');
+            return;
+        }
+
+        const riskName = button.getAttribute('data-risk-name');
+        const riskDescription = button.getAttribute('data-risk-description');
+        const riskLevel = button.getAttribute('data-risk-level');
+        
+        // Get risk data from global store instead of HTML attribute
+        const riskData = riskDataStore[riskName] || [];
+
+        // Show loading state
+        button.disabled = true;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
+
+        fetch('/api/ai-suggestion', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                risk_name: riskName,
+                risk_description: riskDescription,
+                risk_data: riskData,
+                risk_level: riskLevel
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAISuggestion(riskName, data.suggestion);
+            } else {
+                showStatusMessage(`❌ Error generating AI suggestion: ${data.error}`, 'danger');
+            }
+        })
+        .catch(error => {
+            showStatusMessage(`❌ Error generating AI suggestion: ${error.message}`, 'danger');
+        })
+        .finally(() => {
+            // Reset button state
+            button.disabled = false;
+            button.innerHTML = '<i class="fas fa-robot"></i> AI Suggestion';
+        });
+    }
+
+    function showAISuggestion(riskName, suggestion) {
+        const suggestionArea = document.getElementById(`ai-suggestion-${riskName}`);
+        const suggestionContent = document.getElementById(`ai-suggestion-content-${riskName}`);
+        
+        if (suggestionArea && suggestionContent) {
+            // AI now returns HTML content directly, no transformation needed
+            suggestionContent.innerHTML = suggestion;
+            suggestionArea.style.display = '';
+            
+            // Scroll to the suggestion
+            suggestionArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    }
+
+    function hideAISuggestion(riskName) {
+        const suggestionArea = document.getElementById(`ai-suggestion-${riskName}`);
+        if (suggestionArea) {
+            suggestionArea.style.display = 'none';
+        }
+    }
+
+    function showStatusMessage(message, type) {
+        const statusDiv = document.getElementById('azure-openai-status');
+        statusDiv.innerHTML = `<div class="alert alert-${type} alert-dismissible fade show" role="alert">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>`;
     }
 </script>
 

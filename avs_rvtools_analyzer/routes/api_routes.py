@@ -3,6 +3,7 @@ API and MCP routes for AVS RVTools Analyzer.
 Combines both REST API endpoints and MCP tool definitions.
 """
 
+import logging
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -15,9 +16,12 @@ from .. import __version__ as calver_version
 from ..config import AppConfig
 from ..helpers import clean_value_for_json
 from ..models import (
+    AISuggestionRequest,
+    AISuggestionResponse,
     AnalysisResponse,
     APIInfoResponse,
     AvailableRisksResponse,
+    AzureOpenAIStatusResponse,
     ErrorResponse,
     ExcelSheetInfo,
     ExcelToJsonResponse,
@@ -27,6 +31,9 @@ from ..models import (
     SKUInfo,
 )
 from ..services import AnalysisService, FileService, SKUService
+from ..services.azure_openai_service import AzureOpenAIService
+
+logger = logging.getLogger(__name__)
 
 
 class AnalyzeFileRequest(BaseModel):
@@ -82,6 +89,7 @@ def setup_api_routes(app: FastAPI, mcp: FastMCP, config: AppConfig) -> None:
     file_service = FileService(config.files)
     analysis_service = AnalysisService()
     sku_service = SKUService(config.paths.sku_data_file)
+    azure_openai_service = AzureOpenAIService()
 
     # API Routes
     @app.get(
@@ -385,3 +393,78 @@ def setup_api_routes(app: FastAPI, mcp: FastMCP, config: AppConfig) -> None:
 
         # Return simplified response with just the data
         return json_result
+
+    # Azure OpenAI Integration Endpoints
+
+    @app.post(
+        "/api/ai-suggestion",
+        tags=["AI Integration"],
+        summary="Get AI Risk Analysis Suggestion",
+        description="Get AI-powered suggestions for a specific migration risk using Azure OpenAI",
+        response_model=AISuggestionResponse,
+    )
+    async def get_ai_suggestion(request: AISuggestionRequest):
+        """Get AI-powered suggestions for a specific migration risk."""
+        try:
+            # Debug logging
+            logger.debug(f"AI suggestion request for risk: {request.risk_name}")
+            logger.debug(f"Risk data count: {len(request.risk_data) if request.risk_data else 0}")
+            logger.debug(f"Risk data sample: {request.risk_data[:3] if request.risk_data and len(request.risk_data) > 0 else 'Empty or None'}")
+            
+            # Check if Azure OpenAI is configured via environment variables
+            if not azure_openai_service.is_configured:
+                return AISuggestionResponse(
+                    success=False,
+                    error="Azure OpenAI not configured via environment variables",
+                    risk_name=request.risk_name
+                )
+            
+            # Get AI suggestion
+            suggestion = azure_openai_service.get_risk_analysis_suggestion(
+                risk_name=request.risk_name,
+                risk_description=request.risk_description,
+                risk_data=request.risk_data,
+                risk_level=request.risk_level
+            )
+            
+            if suggestion:
+                return AISuggestionResponse(
+                    success=True,
+                    suggestion=suggestion,
+                    risk_name=request.risk_name
+                )
+            else:
+                return AISuggestionResponse(
+                    success=False,
+                    error="Failed to generate AI suggestion",
+                    risk_name=request.risk_name
+                )
+                
+        except Exception as e:
+            return AISuggestionResponse(
+                success=False,
+                error=f"Error generating AI suggestion: {str(e)}",
+                risk_name=request.risk_name
+            )
+
+
+    @app.get(
+        "/api/azure-openai-status",
+        tags=["AI Integration"],
+        summary="Get Azure OpenAI Configuration Status",
+        description="Get the current configuration status of Azure OpenAI integration",
+        response_model=AzureOpenAIStatusResponse,
+    )
+    async def get_azure_openai_status():
+        """Get Azure OpenAI configuration status."""
+        try:
+            status = azure_openai_service.get_configuration_status()
+            return AzureOpenAIStatusResponse(
+                is_configured=status["is_configured"],
+                deployment_name=status["deployment_name"]
+            )
+        except Exception as e:
+            return AzureOpenAIStatusResponse(
+                is_configured=False,
+                deployment_name=None
+            )

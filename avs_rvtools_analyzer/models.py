@@ -368,3 +368,34 @@ class StorageConstants:
 
     INDEPENDENT_PERSISTENT = "independent_persistent"
     LARGE_VM_THRESHOLD_TB = 10
+
+
+# Azure OpenAI Integration Models
+
+
+
+class AISuggestionRequest(BaseModel):
+    """Request model for AI risk analysis suggestions."""
+
+    risk_name: str = Field(description="Name of the risk function")
+    risk_description: str = Field(description="Description of the risk")
+    risk_data: List[Dict[str, Any]] = Field(description="Risk data items")
+    risk_level: str = Field(description="Risk severity level")
+
+
+class AISuggestionResponse(BaseModel):
+    """Response model for AI risk analysis suggestions."""
+
+    success: bool = Field(description="Whether the suggestion generation was successful")
+    suggestion: Optional[str] = Field(None, description="AI-generated suggestion")
+    error: Optional[str] = Field(None, description="Error message if failed")
+    risk_name: str = Field(description="Name of the risk that was analyzed")
+
+
+
+
+class AzureOpenAIStatusResponse(BaseModel):
+    """Response model for Azure OpenAI configuration status."""
+
+    is_configured: bool = Field(description="Whether Azure OpenAI is configured via environment variables")
+    deployment_name: Optional[str] = Field(None, description="Deployment name if configured via env vars")

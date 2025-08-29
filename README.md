@@ -1,12 +1,15 @@
-# AVS RVTools Analyzer
+# AI supercharged RVTools Analyzer for Azure VMware Solution
 
-A unified FastAPI application for analyzing RVTools data with both web interface and AI integration capabilities. Provides insights into Azure VMware Solution migration risks through an intuitive web UI and Model Context Protocol (MCP) server for AI tool integration.
+A unified FastAPI application for analyzing RVTools data with both web interface and AI integration capabilities.
+Provides insights into Azure VMware Solution migration risks through an intuitive web UI and Model Context Protocol (MCP)
+server for AI tool integration.
 
 ## Features
 
 - **Unified Server**: Single application providing both web interface and MCP API
 - **Web Interface**: Upload and analyze RVTools Excel files through a user-friendly interface
-- **AI Integration**: MCP server capabilities for AI assistants to analyze migration risks
+- **Azure OpenAI Integration**: AI-powered risk analysis suggestions with environment variable configuration
+- **MCP Integration**: MCP server capabilities for AI assistants to analyze migration risks
 - **Risk Assessment**: Comprehensive analysis of 14 migration risk categories:
   - vUSB devices (blocking)
   - Risky disks (dynamic)
@@ -29,9 +32,16 @@ A unified FastAPI application for analyzing RVTools data with both web interface
 
 ## AI integration disclaimer
 
-The AI integration in RVTools Analyzer may produce unexpected behavior or inaccuracies in the analysis results. It is strongly recommended to review the output carefully and validate it against known data. Additionally, please ensure that data privacy and compliance requirements are taken into account when using AI tools, as submitted data will be shared with AI systems.
+The AI integration in RVTools Analyzer may produce unexpected behavior or inaccuracies in the analysis results.
 
-The provided tools **run locally** to generate an analysis report from the uploaded RVTools file. If integrated with AI models, the data is processed and analyzed to deliver deeper insights and recommendations. If your AI models are not running in a local or secure environment, it is essential to verify that data is handled appropriately and in compliance with applicable regulations and your organization’s policies.
+⚠️ It is strongly recommended to review the output carefully and validate it against known data. Additionally, please ensure
+that data privacy and compliance requirements are taken into account when using AI tools, as submitted data will be shared
+with AI systems. ⚠️
+
+The provided tools **run locally** to generate an analysis report from the uploaded RVTools file. If integrated with AI models,
+the data is processed and analyzed to deliver deeper insights and recommendations. If your AI models are not running in a
+local or secure environment, it is essential to verify that data is handled appropriately and in compliance with applicable
+regulations and your organization’s policies.
 
 ## Installation and Usage
 
@@ -109,6 +119,41 @@ uv tool install dist/avs_rvtools_analyzer-*.whl
 
 # Using pip
 pip install .
+```
+
+## Azure OpenAI Integration
+
+The application supports [Azure OpenAI](https://azure.microsoft.com/en-us/products/ai-foundry/models/openai/) integration for AI-powered
+risk analysis suggestions. This feature provides intelligent recommendations for migration risks detected in your RVTools data.
+
+### Prerequisites
+
+To use Azure OpenAI integration, you need:
+
+1. **Azure OpenAI Resource**: Create an Azure OpenAI resource in your Azure subscription
+2. **Model Deployment**: Deploy a compatible model (e.g., GPT-4, GPT-3.5-turbo) in your Azure OpenAI resource
+3. **API Access**: Obtain your endpoint URL and API key from the Azure portal
+
+For detailed setup instructions, see [docs/azure-openai-integration.md](docs/azure-openai-integration.md).
+
+### Configuration
+
+Configure Azure OpenAI using environment variables (server-side only):
+
+```bash
+export AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com/"
+export AZURE_OPENAI_API_KEY="your-api-key"
+export AZURE_OPENAI_DEPLOYMENT_NAME="gpt-4.1"
+```
+
+**Using .env file (recommended for development):**
+
+Create a `.env` file in the project root:
+
+```env
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
+AZURE_OPENAI_API_KEY=your-api-key
+AZURE_OPENAI_DEPLOYMENT_NAME=gpt-4.1
 ```
 
 ## Development
@@ -196,6 +241,7 @@ For AI models and automated analysis, the application supports a flexible workfl
 1. **Excel to JSON Conversion**: Use `/api/convert-to-json` to convert RVTools Excel files into structured JSON data
 2. **JSON Data Analysis**: Use `/api/analyze-json` to analyze the converted JSON data for migration risks
 3. **Direct Analysis**: Alternatively, use `/api/analyze-upload` for direct file analysis without conversion
+4. **AI based suggestions**: Use `/api/ai-suggestions` to get AI-generated suggestions for a migration risks
 
 This workflow enables AI models to process RVTools data in multiple formats and provides maximum flexibility for automated migration assessments.
 

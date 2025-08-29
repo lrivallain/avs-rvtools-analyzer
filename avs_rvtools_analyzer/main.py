@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 import pandas as pd
 import xlrd
+from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -81,6 +82,9 @@ app = None
 
 def create_app(config: AppConfig = None, debug: bool = False) -> FastAPI:
     """Create and configure FastAPI application."""
+    # Load environment variables from .env file
+    load_dotenv()
+    
     config = config or AppConfig()
 
     # Setup logging for the entire application
