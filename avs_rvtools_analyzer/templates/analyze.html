@@ -62,7 +62,6 @@
                                 data-risk-name="{{ risk_name }}" 
                                 data-risk-description="{{ risk_data.risk_info.description if risk_data.risk_info else '' }}"
                                 data-risk-level="{{ risk_data.risk_level }}"
-                                data-risk-data="{{ risk_data.data | tojson | e }}"
                                 onclick="getAISuggestion(this)"
                                 style="display: none;">
                             <i class="fas fa-robot"></i> AI Suggestion
@@ -252,6 +251,13 @@
 </style>
 
 <script>
+    // Store risk data globally to avoid HTML attribute size limits
+    const riskDataStore = {
+        {% for risk_name, risk_data in risk_results.risks.items() %}
+        "{{ risk_name }}": {{ risk_data.data | tojson | safe }},
+        {% endfor %}
+    };
+
     function downloadTableAsCSV(button) {
         const tableId = button.getAttribute('data-id');
         const table = document.getElementById(tableId);
@@ -464,22 +470,23 @@
         const riskName = button.getAttribute('data-risk-name');
         const riskDescription = button.getAttribute('data-risk-description');
         const riskLevel = button.getAttribute('data-risk-level');
-        const riskDataStr = button.getAttribute('data-risk-data');
         
-        let riskData;
-        try {
-            riskData = JSON.parse(riskDataStr);
-            console.log('Parsed risk data:', riskData);
-            console.log('Risk data length:', riskData ? riskData.length : 'null');
-        } catch (e) {
-            console.error('Error parsing risk data:', e);
-            console.error('Risk data string:', riskDataStr);
-            riskData = [];
-        }
+        // Get risk data from global store instead of HTML attribute
+        const riskData = riskDataStore[riskName] || [];
+        
+        console.log('Risk data from global store:', riskData);
+        console.log('Risk data length:', riskData ? riskData.length : 'null');
 
         // Show loading state
         button.disabled = true;
         button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
+
+        console.log('Sending AI suggestion request with:', {
+            risk_name: riskName,
+            risk_description: riskDescription,
+            risk_data: riskData,
+            risk_level: riskLevel
+        });
 
         fetch('/api/ai-suggestion', {
             method: 'POST',
