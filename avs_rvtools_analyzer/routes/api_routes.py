@@ -20,9 +20,7 @@ from ..models import (
     AnalysisResponse,
     APIInfoResponse,
     AvailableRisksResponse,
-    AzureOpenAIConfigRequest,
     AzureOpenAIStatusResponse,
-    AzureOpenAITestResponse,
     ErrorResponse,
     ExcelSheetInfo,
     ExcelToJsonResponse,
@@ -405,27 +403,20 @@ def setup_api_routes(app: FastAPI, mcp: FastMCP, config: AppConfig) -> None:
     async def get_ai_suggestion(request: AISuggestionRequest):
         """Get AI-powered suggestions for a specific migration risk."""
         try:
-            # Check if already configured via env vars, otherwise configure with request data
-            if not azure_openai_service.configured_via_env:
-                configured = azure_openai_service.configure(
-                    azure_endpoint=request.azure_endpoint,
-                    api_key=request.api_key
+            # Check if Azure OpenAI is configured via environment variables
+            if not azure_openai_service.is_configured:
+                return AISuggestionResponse(
+                    success=False,
+                    error="Azure OpenAI not configured via environment variables",
+                    risk_name=request.risk_name
                 )
-                
-                if not configured:
-                    return AISuggestionResponse(
-                        success=False,
-                        error="Failed to configure Azure OpenAI client",
-                        risk_name=request.risk_name
-                    )
             
             # Get AI suggestion
             suggestion = azure_openai_service.get_risk_analysis_suggestion(
                 risk_name=request.risk_name,
                 risk_description=request.risk_description,
                 risk_data=request.risk_data,
-                risk_level=request.risk_level,
-                deployment_name=request.deployment_name
+                risk_level=request.risk_level
             )
             
             if suggestion:
@@ -448,38 +439,6 @@ def setup_api_routes(app: FastAPI, mcp: FastMCP, config: AppConfig) -> None:
                 risk_name=request.risk_name
             )
 
-    @app.post(
-        "/api/test-azure-openai",
-        tags=["AI Integration"],
-        summary="Test Azure OpenAI Connection",
-        description="Test connection to Azure OpenAI with provided credentials",
-        response_model=AzureOpenAITestResponse,
-    )
-    async def test_azure_openai_connection(request: AzureOpenAIConfigRequest):
-        """Test Azure OpenAI connection with provided credentials or environment variables."""
-        try:
-            # If configured via env vars, test with env vars, otherwise use request data
-            if azure_openai_service.configured_via_env:
-                result = azure_openai_service.test_connection()
-            else:
-                result = azure_openai_service.test_connection(
-                    azure_endpoint=request.azure_endpoint,
-                    api_key=request.api_key,
-                    deployment_name=request.deployment_name
-                )
-            
-            return AzureOpenAITestResponse(
-                success=result["success"],
-                message=result["message"],
-                response=result.get("response")
-            )
-            
-        except Exception as e:
-            return AzureOpenAITestResponse(
-                success=False,
-                message=f"Connection test failed: {str(e)}",
-                response=None
-            )
 
     @app.get(
         "/api/azure-openai-status",
@@ -494,12 +453,10 @@ def setup_api_routes(app: FastAPI, mcp: FastMCP, config: AppConfig) -> None:
             status = azure_openai_service.get_configuration_status()
             return AzureOpenAIStatusResponse(
                 is_configured=status["is_configured"],
-                configured_via_env=status["configured_via_env"],
                 deployment_name=status["deployment_name"]
             )
         except Exception as e:
             return AzureOpenAIStatusResponse(
                 is_configured=False,
-                configured_via_env=False,
                 deployment_name=None
             )
