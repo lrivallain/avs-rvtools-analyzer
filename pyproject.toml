@@ -19,7 +19,8 @@ dependencies = [
     "jinja2",
     "python-multipart",
     "fastmcp",
-    "openai"
+    "openai",
+    "python-dotenv"
 ]
 
 [project.scripts]

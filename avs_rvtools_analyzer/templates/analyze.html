@@ -450,7 +450,7 @@
                     btn.style.display = '';
                 });
                 
-                console.log(`Azure OpenAI configured via environment variables with deployment: ${data.deployment_name || 'default'}`);
+                console.log('Azure OpenAI configured via environment variables');
             }
         })
         .catch(error => {
@@ -473,20 +473,10 @@
         
         // Get risk data from global store instead of HTML attribute
         const riskData = riskDataStore[riskName] || [];
-        
-        console.log('Risk data from global store:', riskData);
-        console.log('Risk data length:', riskData ? riskData.length : 'null');
 
         // Show loading state
         button.disabled = true;
         button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
-
-        console.log('Sending AI suggestion request with:', {
-            risk_name: riskName,
-            risk_description: riskDescription,
-            risk_data: riskData,
-            risk_level: riskLevel
-        });
 
         fetch('/api/ai-suggestion', {
             method: 'POST',
