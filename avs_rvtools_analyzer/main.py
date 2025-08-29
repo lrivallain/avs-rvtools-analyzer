@@ -27,7 +27,7 @@ from pydantic import BaseModel
 from . import __version__ as calver_version
 from .config import AppConfig
 from .core.error_handlers import setup_error_handlers
-from .helpers import load_sku_data
+from .helpers import json_serializer, load_sku_data
 from .risk_detection import gather_all_risks, get_available_risks
 from .routes.api_routes import setup_api_routes
 from .routes.web_routes import setup_web_routes
@@ -84,7 +84,7 @@ def create_app(config: AppConfig = None, debug: bool = False) -> FastAPI:
     """Create and configure FastAPI application."""
     # Load environment variables from .env file
     load_dotenv()
-    
+
     config = config or AppConfig()
 
     # Setup logging for the entire application
@@ -144,6 +144,9 @@ def create_app(config: AppConfig = None, debug: bool = False) -> FastAPI:
 
 def _setup_jinja_templates(templates: Jinja2Templates) -> None:
     """Setup Jinja2 template configuration."""
+    # Configure JSON encoder to handle pandas Timestamps and other objects
+    templates.env.policies["json.dumps_kwargs"] = {"default": json_serializer}
+
     templates.env.filters["convert_mib_to_human_readable"] = (
         convert_mib_to_human_readable
     )

@@ -373,7 +373,6 @@ class StorageConstants:
 # Azure OpenAI Integration Models
 
 
-
 class AISuggestionRequest(BaseModel):
     """Request model for AI risk analysis suggestions."""
 
@@ -386,16 +385,20 @@ class AISuggestionRequest(BaseModel):
 class AISuggestionResponse(BaseModel):
     """Response model for AI risk analysis suggestions."""
 
-    success: bool = Field(description="Whether the suggestion generation was successful")
+    success: bool = Field(
+        description="Whether the suggestion generation was successful"
+    )
     suggestion: Optional[str] = Field(None, description="AI-generated suggestion")
     error: Optional[str] = Field(None, description="Error message if failed")
     risk_name: str = Field(description="Name of the risk that was analyzed")
 
 
-
-
 class AzureOpenAIStatusResponse(BaseModel):
     """Response model for Azure OpenAI configuration status."""
 
-    is_configured: bool = Field(description="Whether Azure OpenAI is configured via environment variables")
-    deployment_name: Optional[str] = Field(None, description="Deployment name if configured via env vars")
+    is_configured: bool = Field(
+        description="Whether Azure OpenAI is configured via environment variables"
+    )
+    deployment_name: Optional[str] = Field(
+        None, description="Deployment name if configured via env vars"
+    )

@@ -144,6 +144,10 @@ def clean_value_for_json(value) -> str:
         return ""
     elif isinstance(value, datetime):
         return value.isoformat()
+    elif hasattr(
+        value, "isoformat"
+    ):  # Handle pandas Timestamp and other datetime-like objects
+        return value.isoformat()
     elif isinstance(value, (int, float, str, bool)):
         return value
     else:
@@ -161,6 +165,10 @@ def json_serializer(obj):
         The serialized object
     """
     if isinstance(obj, datetime):
+        return obj.isoformat()
+    elif hasattr(
+        obj, "isoformat"
+    ):  # Handle pandas Timestamp and other datetime-like objects
         return obj.isoformat()
     elif hasattr(obj, "__dict__"):
         return obj.__dict__
