@@ -175,8 +175,8 @@ Please provide a comprehensive analysis in HTML format with the following sectio
         Returns:
             str: Formatted data string
         """
-        logger.info(f"Formatting risk data: received {len(risk_data) if risk_data else 0} items")
-        logger.info(f"Risk data sample for prompt: {risk_data[:2] if risk_data and len(risk_data) > 0 else 'Empty or None'}")
+        logger.debug(f"Formatting risk data: received {len(risk_data) if risk_data else 0} items")
+        logger.debug(f"Risk data sample for prompt: {risk_data[:2] if risk_data and len(risk_data) > 0 else 'Empty or None'}")
         
         if not risk_data:
             return "No specific data items available for this risk."
@@ -201,7 +201,7 @@ Please provide a comprehensive analysis in HTML format with the following sectio
         result += '\n'.join(formatted_items)
         result += f"\n\nPlease analyze these specific issues and provide recommendations tailored to addressing each type of problem found."
         
-        logger.info(f"Formatted prompt length: {len(result)} characters")
+        logger.debug(f"Formatted prompt length: {len(result)} characters")
         
         return result
 

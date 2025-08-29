@@ -407,9 +407,9 @@ def setup_api_routes(app: FastAPI, mcp: FastMCP, config: AppConfig) -> None:
         """Get AI-powered suggestions for a specific migration risk."""
         try:
             # Debug logging
-            logger.info(f"AI suggestion request for risk: {request.risk_name}")
-            logger.info(f"Risk data count: {len(request.risk_data) if request.risk_data else 0}")
-            logger.info(f"Risk data sample: {request.risk_data[:3] if request.risk_data and len(request.risk_data) > 0 else 'Empty or None'}")
+            logger.debug(f"AI suggestion request for risk: {request.risk_name}")
+            logger.debug(f"Risk data count: {len(request.risk_data) if request.risk_data else 0}")
+            logger.debug(f"Risk data sample: {request.risk_data[:3] if request.risk_data and len(request.risk_data) > 0 else 'Empty or None'}")
             
             # Check if Azure OpenAI is configured via environment variables
             if not azure_openai_service.is_configured:
