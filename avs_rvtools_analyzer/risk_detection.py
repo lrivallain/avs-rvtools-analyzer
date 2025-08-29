@@ -419,7 +419,7 @@ def detect_non_intel_hosts(excel_data: pd.ExcelFile) -> Dict[str, Any]:
 
     vhost_data = excel_data.parse("vHost")
     non_intel_hosts = vhost_data[
-        ~vhost_data["CPU Model"].str.contains("Intel", na=False)
+        ~vhost_data["CPU Model"].str.lower().str.contains("intel", na=False)
     ][["Host", "Datacenter", "Cluster", "CPU Model", "# VMs"]].to_dict(orient="records")
 
     logger.info(f"detect_non_intel_hosts: Found {len(non_intel_hosts)} non-Intel hosts")
