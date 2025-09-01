@@ -70,7 +70,26 @@
                 <div class="p-2 bg-success bg-opacity-10 rounded">
                     <i class="fas fa-leaf text-success mb-1"></i>
                     <div class="fw-bold text-success" id="cumulative-carbon">0μg CO₂e</div>
-                    <small class="text-muted">carbon footprint</small>
+                    <small class="text-muted">
+                        carbon footprint 
+                        <i class="fas fa-info-circle text-info ms-1" 
+                           data-bs-toggle="popover" 
+                           data-bs-placement="bottom" 
+                           data-bs-html="true"
+                           data-bs-trigger="click"
+                           data-bs-title="<strong>Carbon Footprint Calculation</strong>"
+                           data-bs-content="<strong>Method:</strong> ~0.0047 g CO₂e per 1000 tokens<br>
+                           <strong>Formula:</strong> Energy (kWh) × Grid Intensity (gCO₂/kWh)<br>
+                           <strong>Example:</strong> 0.01 Wh per 1000 tokens × 470 gCO₂/kWh<br><br>
+                           <strong>Note:</strong> Approximate value. Actual footprint varies by GPU model, batching, model size, and infrastructure.<br><br>
+                           <strong>Sources & Tools:</strong><br>
+                           • <a href='https://arxiv.org/abs/1906.02243' target='_blank' class='text-primary'>Strubell et al. - Energy and Policy Considerations</a><br>
+                           • <a href='https://arxiv.org/abs/1910.09700' target='_blank' class='text-primary'>Lacoste et al. - Quantifying ML Carbon Emissions</a><br>
+                           • <a href='https://carbontracker.org/' target='_blank' class='text-primary'>CarbonTracker</a> | <a href='https://github.com/mlco2/codecarbon' target='_blank' class='text-primary'>CodeCarbon</a><br>
+                           • <a href='https://ourworldindata.org/co2-intensity-electricity' target='_blank' class='text-primary'>Grid Carbon Intensities</a><br><br>
+                           <small class='text-muted'>Click outside to close</small>"
+                           style="cursor: pointer;"></i>
+                    </small>
                 </div>
             </div>
             <div class="col-md-4">
@@ -134,62 +153,35 @@
                     <table class="table table-striped resizable-table" id="{{ risk_name }}-table">
                         <thead>
                             <tr>
-                                {% if risk_data.data is mapping %}
-                                    <!-- Handle dictionary data (like ESX versions) -->
-                                    <th>Item</th>
-                                    <th>Count</th>
-                                    {% if risk_name == 'detect_esx_versions' and risk_data.details and risk_data.details.version_risks %}
-                                        <th>Risk Level</th>
-                                    {% endif %}
-                                {% else %}
-                                    <!-- Handle list of dictionaries -->
-                                    {% for key in risk_data.data[0].keys() %}
-                                        <th>{{ key }}</th>
-                                    {% endfor %}
-                                {% endif %}
+                                <!-- Handle list of dictionaries -->
+                                {% for key in risk_data.data[0].keys() %}
+                                    <th>{{ key }}</th>
+                                {% endfor %}
                             </tr>
                         </thead>
                         <tbody>
-                            {% if risk_data.data is mapping %}
-                                <!-- Render dictionary as key-value pairs -->
-                                {% for key, value in risk_data.data.items() %}
-                                    <tr>
-                                        <td>{{ key }}</td>
-                                        <td>{{ value }}</td>
-                                        {% if risk_name == 'detect_esx_versions' and risk_data.details and risk_data.details.version_risks %}
-                                            <td>
-                                                {% set version_risk = risk_data.details.version_risks.get(key, 'info') %}
-                                                <span class="badge rounded-pill {{ get_risk_badge_class(version_risk) }}">
-                                                    {{ get_risk_display_name(version_risk) }}
-                                                </span>
-                                            </td>
-                                        {% endif %}
-                                    </tr>
-                                {% endfor %}
-                            {% else %}
-                                <!-- Render list of dictionaries -->
-                                {% for item in risk_data.data %}
-                                    <tr>
-                                        {% for key, value in item.items() %}
-                                            <td class="wrap">
-                                                {% if key == 'Risk Level' %}
-                                                <span class="badge rounded-pill {{ get_risk_badge_class(value) }}">
-                                                    {{ get_risk_display_name(value) }}
-                                                </span>
-                                                {% elif value is sameas true or value|string|lower in ['true', 'yes'] %}
-                                                    <span class="text-success"><strong>✓</strong></span>
-                                                {% elif value is sameas false or value|string|lower in ['false', 'no'] %}
-                                                    <span class="text-danger">✘</span>
-                                                {% elif 'MiB' in key and value|string|length > 0 %}
-                                                    {{ value | convert_mib_to_human_readable }}
-                                                {% else %}
-                                                    {{ value }}
-                                                {% endif %}
-                                            </td>
-                                        {% endfor %}
-                                    </tr>
-                                {% endfor %}
-                            {% endif %}
+                            <!-- Render list of dictionaries -->
+                            {% for item in risk_data.data %}
+                                <tr>
+                                    {% for key, value in item.items() %}
+                                        <td class="wrap">
+                                            {% if key == 'Risk Level' %}
+                                            <span class="badge rounded-pill {{ get_risk_badge_class(value) }}">
+                                                {{ get_risk_display_name(value) }}
+                                            </span>
+                                            {% elif value is sameas true or value|string|lower in ['true', 'yes'] %}
+                                                <span class="text-success"><strong>✓</strong></span>
+                                            {% elif value is sameas false or value|string|lower in ['false', 'no'] %}
+                                                <span class="text-danger">✘</span>
+                                            {% elif 'MiB' in key and value|string|length > 0 %}
+                                                {{ value | convert_mib_to_human_readable }}
+                                            {% else %}
+                                                {{ value }}
+                                            {% endif %}
+                                        </td>
+                                    {% endfor %}
+                                </tr>
+                            {% endfor %}
                         </tbody>
                     </table>
                 {% endif %}
@@ -289,6 +281,55 @@
         .ai-analysis-metrics {
             display: none !important;
         }
+    }
+
+    /* Custom popover styles for carbon footprint info */
+    .popover {
+        max-width: 400px;
+        font-size: 0.85rem;
+        background-color: #2d3748;
+        border: 1px solid #4a5568;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    }
+    
+    .popover-header {
+        background-color: #1a202c;
+        border-bottom: 1px solid #4a5568;
+        font-weight: 600;
+        color: #e2e8f0;
+    }
+    
+    .popover-body {
+        line-height: 1.4;
+        text-align: left;
+        background-color: #2d3748;
+        color: #e2e8f0;
+    }
+    
+    .popover-body a {
+        color: #63b3ed !important;
+        text-decoration: underline;
+    }
+    
+    .popover-body a:hover {
+        color: #90cdf4 !important;
+    }
+    
+    .popover-body strong {
+        color: #f7fafc;
+    }
+    
+    .popover-body .text-muted {
+        color: #a0aec0 !important;
+    }
+    
+    /* Dark theme popover arrow */
+    .popover .popover-arrow::before {
+        border-bottom-color: #2d3748;
+    }
+    
+    .popover .popover-arrow::after {
+        border-bottom-color: #2d3748;
     }
 </style>
 
@@ -403,6 +444,29 @@
     // Initialize resizable tables when DOM is loaded
     document.addEventListener('DOMContentLoaded', function() {
         makeTablesResizable();
+
+        // Initialize Bootstrap popovers for carbon footprint info
+        var popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'));
+        var popoverList = popoverTriggerList.map(function (popoverTriggerEl) {
+            return new bootstrap.Popover(popoverTriggerEl, {
+                container: 'body',
+                sanitize: false // Allow HTML content including links
+            });
+        });
+
+        // Close popover when clicking outside
+        document.addEventListener('click', function (e) {
+            popoverTriggerList.forEach(function (popoverTriggerEl) {
+                var popoverInstance = bootstrap.Popover.getInstance(popoverTriggerEl);
+                if (popoverInstance && !popoverTriggerEl.contains(e.target)) {
+                    // Check if click is not inside the popover content
+                    var popover = document.querySelector('.popover');
+                    if (!popover || !popover.contains(e.target)) {
+                        popoverInstance.hide();
+                    }
+                }
+            });
+        });
 
         // Check Azure OpenAI configuration status
         checkAzureOpenAIStatus();
