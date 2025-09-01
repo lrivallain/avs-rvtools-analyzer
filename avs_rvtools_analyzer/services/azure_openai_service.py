@@ -127,14 +127,19 @@ class AzureOpenAIService:
             output_tokens = response.usage.completion_tokens if response.usage else 0
             input_tokens = response.usage.prompt_tokens if response.usage else 0
             carbon_footprint = self._calculate_carbon_footprint(tokens_used)
-            logger.info("Generated suggestion for risk: %s (tokens used: %s, carbon footprint: %s)", risk_name, tokens_used, carbon_footprint)
+            logger.info(
+                "Generated suggestion for risk: %s (tokens used: %s, carbon footprint: %s)",
+                risk_name,
+                tokens_used,
+                carbon_footprint,
+            )
 
             return {
                 "suggestion": suggestion,
                 "tokens_used": tokens_used,
                 "input_tokens": input_tokens,
                 "output_tokens": output_tokens,
-                "carbon_footprint": carbon_footprint
+                "carbon_footprint": carbon_footprint,
             }
 
         except Exception as e:
@@ -216,17 +221,17 @@ Please provide a concise analysis in HTML format with the following sections (MA
 
         # Distribute words across sections with reasonable proportions
         total_words = estimated_words
-        impact_words = int(total_words * 0.25)      # 25%
-        actions_words = int(total_words * 0.375)    # 37.5%
-        strategy_words = int(total_words * 0.25)    # 25%
-        timeline_words = int(total_words * 0.125)   # 12.5%
+        impact_words = int(total_words * 0.25)  # 25%
+        actions_words = int(total_words * 0.375)  # 37.5%
+        strategy_words = int(total_words * 0.25)  # 25%
+        timeline_words = int(total_words * 0.125)  # 12.5%
 
         return {
-            'total': total_words,
-            'impact': impact_words,
-            'actions': actions_words,
-            'strategy': strategy_words,
-            'timeline': timeline_words
+            "total": total_words,
+            "impact": impact_words,
+            "actions": actions_words,
+            "strategy": strategy_words,
+            "timeline": timeline_words,
         }
 
     def _format_risk_data_for_prompt(self, risk_data: List[Dict[str, Any]]) -> str:
@@ -240,10 +245,12 @@ Please provide a concise analysis in HTML format with the following sections (MA
             str: Formatted data string
         """
         logger.debug(
-            "Formatting risk data: received %s items", len(risk_data) if risk_data else 0
+            "Formatting risk data: received %s items",
+            len(risk_data) if risk_data else 0,
         )
         logger.debug(
-            "Risk data sample for prompt: %s", risk_data[:2] if risk_data and len(risk_data) > 0 else 'Empty or None'
+            "Risk data sample for prompt: %s",
+            risk_data[:2] if risk_data and len(risk_data) > 0 else "Empty or None",
         )
 
         if not risk_data:

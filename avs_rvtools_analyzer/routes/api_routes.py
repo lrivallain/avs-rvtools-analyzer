@@ -439,7 +439,7 @@ def setup_api_routes(app: FastAPI, mcp: FastMCP, config: AppConfig) -> None:
                     tokens_used=result["tokens_used"],
                     input_tokens=result["input_tokens"],
                     output_tokens=result["output_tokens"],
-                    carbon_footprint=result["carbon_footprint"]
+                    carbon_footprint=result["carbon_footprint"],
                 )
             else:
                 return AISuggestionResponse(
