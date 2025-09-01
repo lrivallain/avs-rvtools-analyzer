@@ -43,10 +43,45 @@
 
 <!-- Azure OpenAI Disclaimer - Visible when AI is configured via environment variables -->
 <div class="alert alert-warning ai-disclaimer" role="alert" style="display: none;">
-    <i class="fas fa-exclamation-triangle"></i> <strong>Disclaimer:</strong> 
-    AI-generated suggestions are for informational purposes only and should be thoroughly reviewed by qualified professionals. 
-    The tool maintainers cannot be held responsible for the accuracy or consequences of the provided suggestions. 
+    <i class="fas fa-exclamation-triangle"></i> <strong>Disclaimer:</strong>
+    AI-generated suggestions are for informational purposes only and should be thoroughly reviewed by qualified professionals.
+    The tool maintainers cannot be held responsible for the accuracy or consequences of the provided suggestions.
     Always validate recommendations with your specific environment and requirements.
+    <br><br>
+    <i class="fas fa-leaf text-success"></i> <strong>Environmental Responsibility:</strong>
+    Please be mindful when using AI features, as they require significant computational resources and contribute to carbon
+    emissions. Consider the environmental impact and use AI suggestions thoughtfully.
+
+    <!-- Cumulative AI Analysis Impact Tracker -->
+    <div id="cumulative-ai-impact" class="mt-3 p-3 bg-light rounded border" style="display: none;">
+        <div class="d-flex align-items-center mb-2">
+            <i class="fas fa-chart-line text-primary me-2"></i>
+            <strong>AI analysis impact for this session</strong>
+        </div>
+        <div class="row text-center">
+            <div class="col-md-4">
+                <div class="p-2 bg-info bg-opacity-10 rounded">
+                    <i class="fas fa-microchip text-info mb-1"></i>
+                    <div class="fw-bold text-info" id="cumulative-tokens">0</div>
+                    <small class="text-muted">total tokens</small>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="p-2 bg-success bg-opacity-10 rounded">
+                    <i class="fas fa-leaf text-success mb-1"></i>
+                    <div class="fw-bold text-success" id="cumulative-carbon">0μg CO₂e</div>
+                    <small class="text-muted">carbon footprint</small>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="p-2 bg-secondary bg-opacity-10 rounded">
+                    <i class="fas fa-robot text-secondary mb-1"></i>
+                    <div class="fw-bold text-secondary" id="cumulative-requests">0</div>
+                    <small class="text-muted">AI requests</small>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- Risk Detail Cards -->
@@ -58,8 +93,8 @@
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h2>{{ risk_name.replace('detect_', '').replace('_', ' ').title() }}</h2>
                     <div class="d-flex gap-2">
-                        <button class="btn btn-outline-success ai-suggestion-btn" 
-                                data-risk-name="{{ risk_name }}" 
+                        <button class="btn btn-outline-success ai-suggestion-btn"
+                                data-risk-name="{{ risk_name }}"
                                 data-risk-description="{{ risk_data.risk_info.description if risk_data.risk_info else '' }}"
                                 data-risk-level="{{ risk_data.risk_level }}"
                                 onclick="getAISuggestion(this)"
@@ -81,7 +116,7 @@
                         {{ risk_data.risk_info.alert_message | safe }}
                     </div>
                     {% endif %}
-                
+
                     <!-- AI Suggestion Area -->
                     <div id="ai-suggestion-{{ risk_name }}" class="ai-suggestion-area" style="display: none;">
                         <div class="alert alert-info">
@@ -247,6 +282,13 @@
 
     .ai-suggestion-area .alert-heading {
         margin-bottom: 1rem;
+    }
+
+    /* Print styles */
+    @media print {
+        .ai-analysis-metrics {
+            display: none !important;
+        }
     }
 </style>
 
@@ -435,21 +477,30 @@
     // Azure OpenAI Integration Functions
     let azureOpenAIConfigured = false;
 
+    // Cumulative impact tracking
+    let cumulativeImpact = {
+        totalTokens: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        totalCarbonGrams: 0,
+        requests: 0
+    };
+
     function checkAzureOpenAIStatus() {
         fetch('/api/azure-openai-status')
         .then(response => response.json())
         .then(data => {
             if (data.is_configured) {
                 azureOpenAIConfigured = true;
-                
+
                 // Show disclaimer when AI is configured via environment variables
                 document.querySelector('.ai-disclaimer').style.display = 'block';
-                
+
                 // Show AI suggestion buttons
                 document.querySelectorAll('.ai-suggestion-btn').forEach(btn => {
                     btn.style.display = '';
                 });
-                
+
                 console.log('Azure OpenAI configured via environment variables');
             }
         })
@@ -459,7 +510,60 @@
         });
     }
 
+    function updateCumulativeImpact(tokensUsed, inputTokens, outputTokens, carbonFootprint) {
+        // Update cumulative values
+        cumulativeImpact.totalTokens += tokensUsed || 0;
+        cumulativeImpact.inputTokens += inputTokens || 0;
+        cumulativeImpact.outputTokens += outputTokens || 0;
+        cumulativeImpact.requests += 1;
 
+        // Add carbon footprint to cumulative total (carbonFootprint is now just a float in grams)
+        if (carbonFootprint && typeof carbonFootprint === 'number') {
+            cumulativeImpact.totalCarbonGrams += carbonFootprint;
+        }
+
+        // Show the cumulative impact tracker
+        const cumulativeDiv = document.getElementById('cumulative-ai-impact');
+        if (cumulativeDiv) {
+            cumulativeDiv.style.display = 'block';
+        }
+
+        // Update display values only if elements exist
+        const cumulativeTokensEl = document.getElementById('cumulative-tokens');
+        const cumulativeInputTokensEl = document.getElementById('cumulative-input-tokens');
+        const cumulativeOutputTokensEl = document.getElementById('cumulative-output-tokens');
+        const cumulativeRequestsEl = document.getElementById('cumulative-requests');
+        const cumulativeCarbonEl = document.getElementById('cumulative-carbon');
+
+        if (cumulativeTokensEl) {
+            cumulativeTokensEl.textContent = cumulativeImpact.totalTokens.toLocaleString();
+        }
+        if (cumulativeInputTokensEl) {
+            cumulativeInputTokensEl.textContent = cumulativeImpact.inputTokens.toLocaleString();
+        }
+        if (cumulativeOutputTokensEl) {
+            cumulativeOutputTokensEl.textContent = cumulativeImpact.outputTokens.toLocaleString();
+        }
+        if (cumulativeRequestsEl) {
+            cumulativeRequestsEl.textContent = cumulativeImpact.requests;
+        }
+
+        // Format cumulative carbon footprint
+        if (cumulativeCarbonEl) {
+            const formattedCarbon = formatCarbonFootprint(cumulativeImpact.totalCarbonGrams);
+            cumulativeCarbonEl.textContent = formattedCarbon;
+        }
+    }
+
+    function formatCarbonFootprint(totalGrams) {
+        if (totalGrams < 0.001) {
+            return Math.round(totalGrams * 1000000) + 'μg CO₂e';
+        } else if (totalGrams < 1) {
+            return (totalGrams * 1000).toFixed(2) + 'mg CO₂e';
+        } else {
+            return totalGrams.toFixed(3) + 'g CO₂e';
+        }
+    }
 
     function getAISuggestion(button) {
         if (!azureOpenAIConfigured) {
@@ -470,7 +574,7 @@
         const riskName = button.getAttribute('data-risk-name');
         const riskDescription = button.getAttribute('data-risk-description');
         const riskLevel = button.getAttribute('data-risk-level');
-        
+
         // Get risk data from global store instead of HTML attribute
         const riskData = riskDataStore[riskName] || [];
 
@@ -493,7 +597,7 @@
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                showAISuggestion(riskName, data.suggestion);
+                showAISuggestion(riskName, data.suggestion, data.tokens_used, data.input_tokens, data.output_tokens, data.carbon_footprint);
             } else {
                 showStatusMessage(`❌ Error generating AI suggestion: ${data.error}`, 'danger');
             }
@@ -508,15 +612,24 @@
         });
     }
 
-    function showAISuggestion(riskName, suggestion) {
+    function showAISuggestion(riskName, suggestion, tokensUsed, inputTokens, outputTokens, carbonFootprint) {
         const suggestionArea = document.getElementById(`ai-suggestion-${riskName}`);
         const suggestionContent = document.getElementById(`ai-suggestion-content-${riskName}`);
-        
+
         if (suggestionArea && suggestionContent) {
-            // AI now returns HTML content directly, no transformation needed
-            suggestionContent.innerHTML = suggestion;
+            // Update cumulative impact tracking
+            updateCumulativeImpact(tokensUsed, inputTokens, outputTokens, carbonFootprint);
+
+            // Clear previous content
+            suggestionContent.innerHTML = '';
+
+            // Add the AI suggestion content after the metrics
+            const suggestionDiv = document.createElement('div');
+            suggestionDiv.innerHTML = suggestion;
+            suggestionContent.appendChild(suggestionDiv);
+
             suggestionArea.style.display = '';
-            
+
             // Scroll to the suggestion
             suggestionArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
@@ -530,11 +643,24 @@
     }
 
     function showStatusMessage(message, type) {
-        const statusDiv = document.getElementById('azure-openai-status');
-        statusDiv.innerHTML = `<div class="alert alert-${type} alert-dismissible fade show" role="alert">
+        // Create a temporary alert div
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+        alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 1050; max-width: 400px;';
+        alertDiv.innerHTML = `
             ${message}
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>`;
+        `;
+
+        // Add to body
+        document.body.appendChild(alertDiv);
+
+        // Auto-remove after 5 seconds
+        setTimeout(() => {
+            if (alertDiv.parentNode) {
+                alertDiv.remove();
+            }
+        }, 5000);
     }
 </script>
 

@@ -18,6 +18,7 @@ class AzureOpenAIService:
         self.client: Optional[AzureOpenAI] = None
         self.is_configured = False
         self.deployment_name = None
+        self.max_tokens = self._get_max_tokens_config()
 
         # Configure using environment variables only
         self._configure_from_env()
@@ -47,11 +48,30 @@ class AzureOpenAIService:
             logger.info("Azure OpenAI environment variables not found or incomplete")
             self.is_configured = False
 
+    def _get_max_tokens_config(self) -> int:
+        """
+        Get max tokens configuration from environment variable.
+
+        Returns:
+            int: Max tokens value (default 2000 for better completeness)
+        """
+        try:
+            env_value = os.getenv("AZURE_OPENAI_MAX_TOKENS", "500")
+            max_tokens = int(env_value)
+
+            logger.info("Using max_tokens configuration: %s", max_tokens)
+            return max_tokens
+
+        except (ValueError, TypeError):
+            logger.warning("Invalid AZURE_OPENAI_MAX_TOKENS value, using default 2000")
+            return 2000
+
     def get_configuration_status(self) -> Dict[str, Any]:
         """Get the current configuration status."""
         return {
             "is_configured": self.is_configured,
             "deployment_name": self.deployment_name if self.is_configured else None,
+            "max_tokens": self.max_tokens,
         }
 
     def get_risk_analysis_suggestion(
@@ -60,7 +80,7 @@ class AzureOpenAIService:
         risk_description: str,
         risk_data: List[Dict[str, Any]],
         risk_level: str,
-    ) -> Optional[str]:
+    ) -> Optional[Dict[str, Any]]:
         """
         Get AI-powered suggestions for a specific risk.
 
@@ -71,7 +91,8 @@ class AzureOpenAIService:
             risk_level: Risk severity level
 
         Returns:
-            str: AI-generated suggestion or None if failed
+            dict: AI-generated suggestion with token usage or None if failed
+                  Format: {"suggestion": str, "tokens_used": int}
         """
         if not self.is_configured or not self.client:
             logger.warning(
@@ -97,16 +118,27 @@ class AzureOpenAIService:
                     },
                     {"role": "user", "content": prompt},
                 ],
-                max_tokens=1000,
+                max_tokens=self.max_tokens,
                 temperature=0.3,
             )
 
             suggestion = response.choices[0].message.content
-            logger.info(f"Generated suggestion for risk: {risk_name}")
-            return suggestion
+            tokens_used = response.usage.total_tokens if response.usage else 0
+            output_tokens = response.usage.completion_tokens if response.usage else 0
+            input_tokens = response.usage.prompt_tokens if response.usage else 0
+            carbon_footprint = self._calculate_carbon_footprint(tokens_used)
+            logger.info("Generated suggestion for risk: %s (tokens used: %s, carbon footprint: %s)", risk_name, tokens_used, carbon_footprint)
+
+            return {
+                "suggestion": suggestion,
+                "tokens_used": tokens_used,
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+                "carbon_footprint": carbon_footprint
+            }
 
         except Exception as e:
-            logger.error(f"Failed to get AI suggestion for {risk_name}: {e}")
+            logger.error("Failed to get AI suggestion for %s: %s", risk_name, e)
             return None
 
     def _build_risk_analysis_prompt(
@@ -131,6 +163,9 @@ class AzureOpenAIService:
         # Limit data to prevent token overflow
         sample_data = risk_data[:10] if len(risk_data) > 10 else risk_data
 
+        # Calculate word limits based on max_tokens configuration
+        word_limits = self._calculate_word_limits()
+
         prompt = f"""
 ## Azure VMware Solution Migration Risk Analysis
 
@@ -147,12 +182,12 @@ class AzureOpenAIService:
 
 You are analyzing ACTUAL DETECTED ISSUES from a VMware environment scan. These are real problems that exist in the current environment and need to be addressed for Azure VMware Solution migration.
 
-Please provide a comprehensive analysis in HTML format with the following sections:
+Please provide a concise analysis in HTML format with the following sections (MAXIMUM {word_limits['total']} words total):
 
-1. **Impact Assessment**: How these specific detected issues affect Azure VMware Solution migration
-2. **Recommended Actions**: Specific steps to resolve these detected issues before or during migration  
-3. **Migration Strategy**: How to handle these specific items during the migration process
-4. **Timeline Considerations**: When to address these issues in the migration timeline
+1. **Impact Assessment** (max {word_limits['impact']} words): How these specific detected issues affect Azure VMware Solution migration
+2. **Recommended Actions** (max {word_limits['actions']} words): Specific steps to resolve these detected issues before or during migration
+3. **Migration Strategy** (max {word_limits['strategy']} words): How to handle these specific items during the migration process
+4. **Timeline Considerations** (max {word_limits['timeline']} words): When to address these issues in the migration timeline
 
 **Important Instructions:**
 - Analyze the SPECIFIC ISSUES provided in the data above
@@ -163,8 +198,36 @@ Please provide a comprehensive analysis in HTML format with the following sectio
 - Include proper HTML tags for paragraphs, lists, and emphasis
 - Be specific to the detected issues and Azure VMware Solution requirements
 - Do not include HTML document structure tags (html, head, body)
+- STRICTLY ADHERE to word limits for each section to ensure complete responses
 """
         return prompt
+
+    def _calculate_word_limits(self) -> Dict[str, int]:
+        """
+        Calculate word limits for each section based on max_tokens configuration.
+        Since max_tokens only limits output, we can use the full allocation for response.
+
+        Returns:
+            dict: Word limits for each section
+        """
+        # Conservative estimation: 1 token ≈ 0.75 words
+        # Use full max_tokens allocation for output since it doesn't count input
+        estimated_words = int(self.max_tokens * 0.75)
+
+        # Distribute words across sections with reasonable proportions
+        total_words = estimated_words
+        impact_words = int(total_words * 0.25)      # 25%
+        actions_words = int(total_words * 0.375)    # 37.5%
+        strategy_words = int(total_words * 0.25)    # 25%
+        timeline_words = int(total_words * 0.125)   # 12.5%
+
+        return {
+            'total': total_words,
+            'impact': impact_words,
+            'actions': actions_words,
+            'strategy': strategy_words,
+            'timeline': timeline_words
+        }
 
     def _format_risk_data_for_prompt(self, risk_data: List[Dict[str, Any]]) -> str:
         """
@@ -177,10 +240,10 @@ Please provide a comprehensive analysis in HTML format with the following sectio
             str: Formatted data string
         """
         logger.debug(
-            f"Formatting risk data: received {len(risk_data) if risk_data else 0} items"
+            "Formatting risk data: received %s items", len(risk_data) if risk_data else 0
         )
         logger.debug(
-            f"Risk data sample for prompt: {risk_data[:2] if risk_data and len(risk_data) > 0 else 'Empty or None'}"
+            "Risk data sample for prompt: %s", risk_data[:2] if risk_data and len(risk_data) > 0 else 'Empty or None'
         )
 
         if not risk_data:
@@ -202,13 +265,34 @@ Please provide a comprehensive analysis in HTML format with the following sectio
                 formatted_items.append(f"Issue {i}: No detailed information available")
 
         # Add context about the data
-        result = f"Analyzing {len(risk_data)} detected issues:\n\n"
+        result = "Analyzing {} detected issues:\n\n".format(len(risk_data))
         result += "\n".join(formatted_items)
-        result += f"\n\nPlease analyze these specific issues and provide recommendations tailored to addressing each type of problem found."
+        result += "\n\nPlease analyze these specific issues and provide recommendations tailored to addressing each type of problem found."
 
-        logger.debug(f"Formatted prompt length: {len(result)} characters")
+        logger.debug("Formatted prompt length: %s characters", len(result))
 
         return result
+
+    def _calculate_carbon_footprint(self, tokens: int) -> float:
+        """
+        Calculate carbon footprint estimation for AI inference.
+
+        Args:
+            tokens: Number of tokens used
+
+        Returns:
+            float: Carbon footprint in grams CO2e
+        """
+        # Carbon footprint estimation for AI inference
+        # Based on industry estimates:
+        # - GPT-4 class models: ~0.0047 grams CO2e per 1000 tokens
+        # - This includes data center electricity, cooling, and infrastructure
+        # - Assumes average grid carbon intensity and modern data centers
+
+        grams_per_thousand_tokens = 0.0047  # grams CO2e per 1000 tokens
+        total_grams = (tokens / 1000) * grams_per_thousand_tokens
+
+        return round(total_grams, 3)
 
     def test_connection(self) -> Dict[str, Any]:
         """

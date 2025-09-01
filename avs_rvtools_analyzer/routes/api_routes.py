@@ -424,16 +424,22 @@ def setup_api_routes(app: FastAPI, mcp: FastMCP, config: AppConfig) -> None:
                 )
 
             # Get AI suggestion
-            suggestion = azure_openai_service.get_risk_analysis_suggestion(
+            result = azure_openai_service.get_risk_analysis_suggestion(
                 risk_name=request.risk_name,
                 risk_description=request.risk_description,
                 risk_data=request.risk_data,
                 risk_level=request.risk_level,
             )
 
-            if suggestion:
+            if result:
                 return AISuggestionResponse(
-                    success=True, suggestion=suggestion, risk_name=request.risk_name
+                    success=True,
+                    suggestion=result["suggestion"],
+                    risk_name=request.risk_name,
+                    tokens_used=result["tokens_used"],
+                    input_tokens=result["input_tokens"],
+                    output_tokens=result["output_tokens"],
+                    carbon_footprint=result["carbon_footprint"]
                 )
             else:
                 return AISuggestionResponse(
