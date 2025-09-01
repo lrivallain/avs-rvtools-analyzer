@@ -44,13 +44,14 @@ class TestESXVersionRiskDetection:
 
         assert result["count"] > 0, "Should detect ESX version issues"
         assert "data" in result
-        assert isinstance(result["data"], dict)
+        assert isinstance(result["data"], list)
 
         # Should find old versions like 6.5.0 and 6.7.0
         version_data = result["data"]
+        version_strings = [item["ESX Version"] for item in version_data]
         assert any(
             "6.5.0" in str(version) or "6.7.0" in str(version)
-            for version in version_data.keys()
+            for version in version_strings
         )
 
     def test_detect_esx_versions_structure(self, comprehensive_excel_data):

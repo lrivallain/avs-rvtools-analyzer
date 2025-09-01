@@ -55,30 +55,37 @@ def detect_esx_versions(excel_data: pd.ExcelFile) -> Dict[str, Any]:
         logger.warning("detect_esx_versions: No vHost sheet found")
         return create_empty_result()
 
-    version_counts = vhost_data["ESX Version"].value_counts().to_dict()
+    version_counts = vhost_data["ESX Version"].value_counts()
     version_risks = {}
     card_risk = "info"
 
-    for version_str in version_counts.keys():
+    # Convert to list of dictionaries format for consistent API response
+    version_data = []
+    for version_str, count in version_counts.items():
+        risk_level = "info"  # Default risk level
+
         version_match = re.search(r"ESXi (\d+\.\d+\.\d+)", version_str)
         if version_match:
             version_num = version_match.group(1)
             if version_num < ESXVersionThresholds.ERROR_THRESHOLD:
-                version_risks[version_str] = "blocking"
+                risk_level = "blocking"
                 card_risk = "danger"
             elif version_num < ESXVersionThresholds.WARNING_THRESHOLD:
-                version_risks[version_str] = "warning"
+                risk_level = "warning"
                 if card_risk != "danger":
                     card_risk = "warning"
-            else:
-                version_risks[version_str] = "info"
+
+        version_risks[version_str] = risk_level
+        version_data.append(
+            {"ESX Version": version_str, "Count": count, "Risk Level": risk_level}
+        )
 
     logger.info(
         f"detect_esx_versions: Found {len(version_counts)} ESX versions with overall risk level: {card_risk}"
     )
     return {
         "count": len(version_counts),
-        "data": version_counts,
+        "data": version_data,
         "details": {
             "version_risks": version_risks,
             "card_risk": card_risk,
