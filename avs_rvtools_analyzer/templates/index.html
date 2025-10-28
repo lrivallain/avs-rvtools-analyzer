@@ -17,6 +17,12 @@
                     <input class="form-control" type="file" id="file" name="file" accept=".xlsx" required>
                     <div class="form-text">Select an RVTools export file to analyze migration risks, explore data, or convert to JSON format.</div>
                 </div>
+                <div class="mb-3 d-flex justify-content-left">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="filterPoweredOff" name="filterPoweredOff">
+                        <label class="form-check-label" for="filterPoweredOff"><b>Filter out</b> powered off VMs</label>
+                    </div>
+                </div>
                 <div class="d-flex justify-content-between flex-wrap gap-2">
                     <button formaction="/explore" type="submit" class="btn btn-outline-primary btn-sm">
                         <i class="fas fa-search"></i> Explore File Content

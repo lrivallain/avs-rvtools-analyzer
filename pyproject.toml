@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "avs-rvtools-analyzer"
-version = "2025.8.6"
+version = "2025.10.0"
 description = "A tool for analyzing RVTools data."
 readme = "README.md"
 authors = [{ name = "Ludovic Rivallain", email = "ludovic.rivallain+pip@gmail.com" }]
