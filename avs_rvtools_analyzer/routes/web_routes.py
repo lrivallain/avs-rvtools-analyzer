@@ -5,7 +5,7 @@ Web UI routes for AVS RVTools Analyzer.
 import json
 from typing import Any
 
-from fastapi import FastAPI, File, Request, UploadFile
+from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
 
@@ -51,14 +51,14 @@ def setup_web_routes(
         summary="Explore RVTools File",
         description="Upload and explore RVTools Excel file contents",
     )
-    async def explore_file(request: Request, file: UploadFile = File(...)):
+    async def explore_file(request: Request, file: UploadFile = File(...), filterPoweredOff: bool = Form(False)):
         """Upload and explore RVTools Excel file contents."""
         try:
             # Validate file
             file_service.validate_file(file)
 
             # Load Excel file directly from memory (no temp file)
-            excel_data = await file_service.load_excel_file_from_memory(file)
+            excel_data = await file_service.load_excel_file_from_memory(file, filter_powered_off=filterPoweredOff)
 
             # Extract sheets data
             sheets = file_service.get_excel_sheets_data(excel_data)
@@ -81,14 +81,14 @@ def setup_web_routes(
         summary="Analyze Migration Risks",
         description="Upload and analyze RVTools file for migration risks and compatibility issues",
     )
-    async def analyze_migration_risks(request: Request, file: UploadFile = File(...)):
+    async def analyze_migration_risks(request: Request, file: UploadFile = File(...), filterPoweredOff: bool = Form(False)):
         """Upload and analyze RVTools file for migration risks and compatibility issues."""
         try:
             # Validate file
             file_service.validate_file(file)
 
             # Load Excel file directly from memory (no temp file)
-            excel_data = await file_service.load_excel_file_from_memory(file)
+            excel_data = await file_service.load_excel_file_from_memory(file, filter_powered_off=filterPoweredOff)
 
             # Validate Excel data for analysis
             analysis_service.validate_excel_data(excel_data)
@@ -118,14 +118,14 @@ def setup_web_routes(
         summary="Convert to JSON",
         description="Upload and convert RVTools Excel file to JSON format for download",
     )
-    async def convert_to_json(request: Request, file: UploadFile = File(...)):
+    async def convert_to_json(request: Request, file: UploadFile = File(...), filterPoweredOff: bool = Form(False)):
         """Upload and convert RVTools Excel file to JSON format for download."""
         try:
             # Validate file
             file_service.validate_file(file)
 
             # Load Excel file directly from memory (no temp file)
-            excel_data = await file_service.load_excel_file_from_memory(file)
+            excel_data = await file_service.load_excel_file_from_memory(file, filter_powered_off=filterPoweredOff)
 
             # Convert to JSON format - simplified output just like the API
             json_result = {}

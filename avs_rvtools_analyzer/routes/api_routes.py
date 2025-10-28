@@ -41,6 +41,7 @@ class AnalyzeFileRequest(BaseModel):
 
     file_path: str
     include_details: Optional[bool] = False
+    filter_powered_off: Optional[bool] = False
 
 
 class AnalyzeJsonRequest(BaseModel):
@@ -213,7 +214,7 @@ def setup_api_routes(app: FastAPI, mcp: FastMCP, config: AppConfig) -> None:
         file_path = Path(request.file_path)
 
         # Load Excel file
-        excel_data = file_service.load_excel_file(file_path)
+        excel_data = file_service.load_excel_file(file_path, filter_powered_off=request.filter_powered_off)
 
         # Validate Excel data
         analysis_service.validate_excel_data(excel_data)
@@ -247,14 +248,14 @@ def setup_api_routes(app: FastAPI, mcp: FastMCP, config: AppConfig) -> None:
         response_model=AnalysisResponse,
     )
     async def analyze_uploaded_file(
-        file: UploadFile = File(...), include_details: bool = Form(False)
+        file: UploadFile = File(...), include_details: bool = Form(False), filter_powered_off: bool = Form(False)
     ):
         """Analyze uploaded RVTools file."""
         # Validate file
         file_service.validate_file(file)
 
         # Load Excel file directly from memory (no temp file)
-        excel_data = await file_service.load_excel_file_from_memory(file)
+        excel_data = await file_service.load_excel_file_from_memory(file, filter_powered_off=filter_powered_off)
 
         # Validate Excel data
         analysis_service.validate_excel_data(excel_data)
@@ -348,13 +349,14 @@ def setup_api_routes(app: FastAPI, mcp: FastMCP, config: AppConfig) -> None:
         file: UploadFile = File(...),
         include_empty_cells: bool = Form(False),
         max_rows_per_sheet: Optional[int] = Form(1000),
+        filter_powered_off: bool = Form(False),
     ):
         """Convert Excel file to JSON format."""
         # Validate file
         file_service.validate_file(file)
 
         # Load Excel file directly from memory (no temp file)
-        excel_data = await file_service.load_excel_file_from_memory(file)
+        excel_data = await file_service.load_excel_file_from_memory(file, filter_powered_off=filter_powered_off)
 
         # Convert to simplified JSON format - just the data
         json_result = {}

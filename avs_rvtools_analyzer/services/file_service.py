@@ -73,6 +73,42 @@ class FileService:
         extension = filename.rsplit(".", 1)[-1].lower()
         return extension in self.config.allowed_extensions
 
+    def _filter_powered_off_rows(self, data: list, headers: list) -> list:
+        """
+        Filter out rows where Powerstate column equals 'poweredOff'.
+
+        Args:
+            data: List of row dictionaries
+            headers: List of column headers
+
+        Returns:
+            Filtered list of row dictionaries
+        """
+        # Look for Powerstate column (case-sensitive)
+        powerstate_column = None
+        for header in headers:
+            if header == "Powerstate":
+                powerstate_column = header
+                break
+
+        # If no Powerstate column found, return data unchanged
+        if not powerstate_column:
+            logger.debug("No 'Powerstate' column found, skipping power state filtering")
+            return data
+
+        # Filter out rows where Powerstate equals 'poweredOff' (case-sensitive)
+        filtered_data = []
+        filtered_count = 0
+        for row in data:
+            powerstate_value = row.get(powerstate_column)
+            if powerstate_value != "poweredOff":
+                filtered_data.append(row)
+            else:
+                filtered_count += 1
+
+        logger.debug(f"Filtered out {filtered_count} powered off VMs from data")
+        return filtered_data
+
     async def save_uploaded_file(self, file: UploadFile) -> Path:
         """
         Save uploaded file to temporary location.
@@ -108,7 +144,7 @@ class FileService:
             logger.error(f"Error saving uploaded file: {str(e)}")
             raise TemporaryFileError(f"Error saving file: {str(e)}", operation="save")
 
-    async def load_excel_file_from_memory(self, file: UploadFile) -> Dict[str, Any]:
+    async def load_excel_file_from_memory(self, file: UploadFile, filter_powered_off: bool = False) -> Dict[str, Any]:
         """
         Load Excel file directly from memory without saving to disk.
 
@@ -117,6 +153,7 @@ class FileService:
 
         Args:
             file: The uploaded file to process
+            filter_powered_off: If True, filter out rows where Powerstate column equals 'poweredOff'
 
         Returns:
             Dictionary containing sheet data
@@ -163,6 +200,10 @@ class FileService:
                                     row_dict[headers[i]] = cell
                             data.append(row_dict)
 
+                    # Apply power state filtering if requested
+                    if filter_powered_off:
+                        data = self._filter_powered_off_rows(data, headers)
+
                     sheets[sheet_name] = {
                         "headers": headers,
                         "data": data,
@@ -205,6 +246,10 @@ class FileService:
                                             row, col
                                         )
                                 data.append(row_dict)
+
+                        # Apply power state filtering if requested
+                        if filter_powered_off:
+                            data = self._filter_powered_off_rows(data, headers)
 
                         sheets[sheet_name] = {
                             "headers": headers,
@@ -250,12 +295,13 @@ class FileService:
             if "content" in locals():
                 del content
 
-    def load_excel_file(self, file_path: Path) -> Dict[str, Any]:
+    def load_excel_file(self, file_path: Path, filter_powered_off: bool = False) -> Dict[str, Any]:
         """
         Load Excel file and return sheets data.
 
         Args:
             file_path: Path to the Excel file
+            filter_powered_off: If True, filter out rows where Powerstate column equals 'poweredOff'
 
         Returns:
             Dictionary containing sheet data
@@ -302,6 +348,10 @@ class FileService:
                                     row_dict[headers[i]] = cell
                             data.append(row_dict)
 
+                    # Apply power state filtering if requested
+                    if filter_powered_off:
+                        data = self._filter_powered_off_rows(data, headers)
+
                     sheets[sheet_name] = {
                         "headers": headers,
                         "data": data,
@@ -341,6 +391,10 @@ class FileService:
                                             row, col
                                         )
                                 data.append(row_dict)
+
+                        # Apply power state filtering if requested
+                        if filter_powered_off:
+                            data = self._filter_powered_off_rows(data, headers)
 
                         sheets[sheet_name] = {
                             "headers": headers,
