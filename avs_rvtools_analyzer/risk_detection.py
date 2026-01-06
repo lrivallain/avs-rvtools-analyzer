@@ -715,7 +715,7 @@ def detect_shared_disks(excel_data: pd.ExcelFile) -> Dict[str, Any]:
     path_groups = vdisk_data.groupby("Path")
 
     shared_disk_groups = []
-    detected_vms = set()  # Track VMs already detected to avoid duplicates
+    detected_paths = set()  # Track paths already detected to avoid duplicates
 
     # First, detect VMs sharing the same disk path
     for path, group in path_groups:
@@ -728,8 +728,8 @@ def detect_shared_disks(excel_data: pd.ExcelFile) -> Dict[str, Any]:
                 "VMs": ", ".join(sorted(unique_vms)),
             }
 
-            # Add VMs to detected set
-            detected_vms.update(unique_vms)
+            # Add Path to detected set
+            detected_paths.add(path)
 
             # Add optional information if available
             if "Sharing mode" in group.columns:
@@ -760,7 +760,7 @@ def detect_shared_disks(excel_data: pd.ExcelFile) -> Dict[str, Any]:
 
             shared_disk_groups.append(shared_disk_info)
 
-    # Second, detect VMs with Shared Bus != "noSharing" that weren't already detected
+    # Second, detect Paths with Shared Bus != "noSharing" that weren't already detected
     if "Shared Bus" in vdisk_data.columns:
         # Filter for VMs with sharing bus configurations that are not "noSharing"
         sharing_bus_mask = (
@@ -772,9 +772,9 @@ def detect_shared_disks(excel_data: pd.ExcelFile) -> Dict[str, Any]:
         sharing_bus_vms = vdisk_data[sharing_bus_mask]
 
         for _, row in sharing_bus_vms.iterrows():
-            vm_name = row["VM"]
-            if vm_name not in detected_vms:  # Only add if not already detected
-                shared_disk_info = {"Path": row["Path"], "VM Count": 1, "VMs": vm_name}
+            path_name = row["Path"]
+            if path_name not in detected_paths: # Avoid duplicates
+                shared_disk_info = {"Path": path_name, "VM Count": 1, "VMs": row["VM"]}
 
                 # Add the specific sharing information in the correct order
                 if "Sharing mode" in row.index:
@@ -792,11 +792,8 @@ def detect_shared_disks(excel_data: pd.ExcelFile) -> Dict[str, Any]:
                     )
 
                 shared_disk_info["Shared Bus"] = str(row["Shared Bus"])
-
                 shared_disk_groups.append(shared_disk_info)
-
-                detected_vms.add(vm_name)
-
+                detected_paths.add(path)
     logger.info(
         f"detect_shared_disks: Found {len(shared_disk_groups)} shared disk configurations"
     )
