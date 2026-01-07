@@ -5,6 +5,7 @@ Azure OpenAI service for generating risk analysis suggestions.
 import logging
 import os
 from typing import Any, Dict, List, Optional
+import importlib.resources as resources
 
 from openai import AzureOpenAI
 
@@ -154,7 +155,7 @@ class AzureOpenAIService:
         risk_level: str,
     ) -> str:
         """
-        Build a comprehensive prompt for risk analysis.
+        Build the risk analysis prompt from an external markdown template.
 
         Args:
             risk_name: Name of the risk
@@ -165,47 +166,39 @@ class AzureOpenAIService:
         Returns:
             str: Formatted prompt for AI analysis
         """
-        # Limit data to prevent token overflow
         sample_data = risk_data[:10] if len(risk_data) > 10 else risk_data
-
-        # Calculate word limits based on max_tokens configuration
         word_limits = self._calculate_word_limits()
 
-        prompt = f"""
-## Azure VMware Solution Migration Risk Analysis
+        # Load template from package resources, fallback to inline if unavailable
+        template = self._load_prompt_template()
 
-**Risk Type:** {risk_name.replace('detect_', '').replace('_', ' ').title()}
-**Severity Level:** {risk_level.title()}
-**Description:** {risk_description}
+        formatted_prompt = template.format(
+            risk_type=risk_name.replace("detect_", "").replace("_", " ").title(),
+            risk_level=risk_level.title(),
+            risk_description=risk_description,
+            issues_count=len(risk_data),
+            issues_details=self._format_risk_data_for_prompt(sample_data),
+            total_words=word_limits["total"],
+            impact_words=word_limits["impact"],
+            actions_words=word_limits["actions"],
+            strategy_words=word_limits["strategy"],
+            timeline_words=word_limits["timeline"],
+        )
 
-**Detected Issues Count:** {len(risk_data)}
+        return formatted_prompt
 
-**Issue Details:**
-{self._format_risk_data_for_prompt(sample_data)}
+    def _load_prompt_template(self) -> str:
+        """Load the risk analysis prompt template from package resources.
 
-## Analysis Request
-
-You are analyzing ACTUAL DETECTED ISSUES from a VMware environment scan. These are real problems that exist in the current environment and need to be addressed for Azure VMware Solution migration.
-
-Please provide a concise analysis in HTML format with the following sections (MAXIMUM {word_limits['total']} words total):
-
-1. **Impact Assessment** (max {word_limits['impact']} words): How these specific detected issues affect Azure VMware Solution migration
-2. **Recommended Actions** (max {word_limits['actions']} words): Specific steps to resolve these detected issues before or during migration
-3. **Migration Strategy** (max {word_limits['strategy']} words): How to handle these specific items during the migration process
-4. **Timeline Considerations** (max {word_limits['timeline']} words): When to address these issues in the migration timeline
-
-**Important Instructions:**
-- Analyze the SPECIFIC ISSUES provided in the data above
-- Do not state that issues "don't apply" - these are confirmed detected problems
-- Provide actionable recommendations for the actual detected items
-- Generate HTML markup directly (no markdown)
-- Use heading levels h5 and below only (h5, h6)
-- Include proper HTML tags for paragraphs, lists, and emphasis
-- Be specific to the detected issues and Azure VMware Solution requirements
-- Do not include HTML document structure tags (html, head, body)
-- STRICTLY ADHERE to word limits for each section to ensure complete responses
-"""
-        return prompt
+        Returns:
+            The template string with format placeholders.
+        """
+        with resources.files("avs_rvtools_analyzer.prompts").joinpath(
+            "risk_analysis_prompt.md"
+        ).open("r", encoding="utf-8") as f:
+            template = f.read()
+            logger.debug("Loaded risk analysis prompt template from package.")
+            return template
 
     def _calculate_word_limits(self) -> Dict[str, int]:
         """

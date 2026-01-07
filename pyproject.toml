@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "avs-rvtools-analyzer"
-version = "2026.01.0"
+version = "2026.01.1"
 description = "A tool for analyzing RVTools data."
 readme = "README.md"
 authors = [{ name = "Ludovic Rivallain", email = "ludovic.rivallain+pip@gmail.com" }]
@@ -38,6 +38,9 @@ dev = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["avs_rvtools_analyzer"]
+include = [
+    "avs_rvtools_analyzer/prompts/**"
+]
 
 [dependency-groups]
 dev = [
