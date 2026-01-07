@@ -38,6 +38,9 @@ dev = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["avs_rvtools_analyzer"]
+include = [
+    "avs_rvtools_analyzer/prompts/**"
+]
 
 [dependency-groups]
 dev = [

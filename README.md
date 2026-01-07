@@ -156,6 +156,20 @@ AZURE_OPENAI_API_KEY=your-api-key
 AZURE_OPENAI_DEPLOYMENT_NAME=gpt-4.1
 ```
 
+### Customizing the AI Prompt
+
+The prompt used to generate AI risk analysis suggestions is managed in a markdown template you can edit without changing code:
+
+- File: [avs_rvtools_analyzer/prompts/risk_analysis_prompt.md](avs_rvtools_analyzer/prompts/risk_analysis_prompt.md)
+
+Available placeholders are populated at runtime:
+
+- `risk_type`, `risk_level`, `risk_description`, `issues_count`
+- `issues_details` (formatted list of detected issues)
+- `total_words`, `impact_words`, `actions_words`, `strategy_words`, `timeline_words`
+
+Edits to this file are picked up on next run. If the file is missing, a safe built-in fallback is used.
+
 ## Development
 
 ### Development Environment
