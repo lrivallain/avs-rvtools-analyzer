@@ -10,6 +10,7 @@ from fastapi.responses import HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
 
 from ..config import AppConfig
+from ..core.exceptions import FileValidationError, ProtectedFileError, UnsupportedFileFormatError
 from ..helpers import clean_value_for_json, json_serializer
 from ..services import AnalysisService, FileService
 
@@ -70,8 +71,15 @@ def setup_web_routes(
             )
 
         except Exception as e:
+            error_type = type(e).__name__
             return templates.TemplateResponse(
-                request=request, name="error.html", context={"message": str(e)}
+                request=request, 
+                name="error.html", 
+                context={
+                    "message": str(e),
+                    "error_type": error_type,
+                    "is_file_validation_error": isinstance(e, (FileValidationError, UnsupportedFileFormatError, ProtectedFileError))
+                }
             )
 
     @app.post(
@@ -108,8 +116,15 @@ def setup_web_routes(
             )
 
         except Exception as e:
+            error_type = type(e).__name__
             return templates.TemplateResponse(
-                request=request, name="error.html", context={"message": str(e)}
+                request=request, 
+                name="error.html", 
+                context={
+                    "message": str(e),
+                    "error_type": error_type,
+                    "is_file_validation_error": isinstance(e, (FileValidationError, UnsupportedFileFormatError, ProtectedFileError))
+                }
             )
 
     @app.post(
@@ -170,6 +185,13 @@ def setup_web_routes(
             )
 
         except Exception as e:
+            error_type = type(e).__name__
             return templates.TemplateResponse(
-                request=request, name="error.html", context={"message": str(e)}
+                request=request, 
+                name="error.html", 
+                context={
+                    "message": str(e),
+                    "error_type": error_type,
+                    "is_file_validation_error": isinstance(e, (FileValidationError, UnsupportedFileFormatError, ProtectedFileError))
+                }
             )

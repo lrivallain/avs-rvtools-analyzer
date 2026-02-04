@@ -73,67 +73,6 @@ class FileService:
         extension = filename.rsplit(".", 1)[-1].lower()
         return extension in self.config.allowed_extensions
 
-    def _detect_format_from_header(self, header: bytes) -> str:
-        """
-        Detect Excel file format from file header bytes.
-
-        Args:
-            header: First 8 bytes of the file
-
-        Returns:
-            'xlsx' for modern Excel files, 'xls' for legacy files, 'unknown' otherwise
-        """
-        # ZIP signature (xlsx is a ZIP-based format)
-        if header[:4] == b'PK\x03\x04':
-            logger.debug("Detected file format: xlsx (ZIP signature)")
-            return 'xlsx'
-
-        # OLE2 compound document signature (old xls format)
-        elif header[:8] == b'\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1':
-            logger.debug("Detected file format: xls (OLE2 signature)")
-            return 'xls'
-
-        logger.warning(f"Unknown file signature: {header.hex()}")
-        return 'unknown'
-
-    def _detect_file_format(self, file_stream: io.BytesIO) -> str:
-        """
-        Detect actual Excel file format by inspecting file signature.
-
-        Args:
-            file_stream: Byte stream of the file
-
-        Returns:
-            'xlsx' for modern Excel files, 'xls' for legacy files, 'unknown' otherwise
-        """
-        try:
-            current_pos = file_stream.tell()
-            file_stream.seek(0)
-            header = file_stream.read(8)
-            file_stream.seek(current_pos)  # Restore position
-            return self._detect_format_from_header(header)
-        except Exception as e:
-            logger.warning(f"Error detecting file format: {e}")
-            return 'unknown'
-
-    def _detect_file_format_from_path(self, file_path: Path) -> str:
-        """
-        Detect actual Excel file format by inspecting file signature from path.
-
-        Args:
-            file_path: Path to the file
-
-        Returns:
-            'xlsx' for modern Excel files, 'xls' for legacy files, 'unknown' otherwise
-        """
-        try:
-            with open(file_path, 'rb') as f:
-                header = f.read(8)
-            return self._detect_format_from_header(header)
-        except Exception as e:
-            logger.warning(f"Error detecting file format: {e}")
-            return 'unknown'
-
     def _filter_powered_off_rows(self, data: list, headers: list) -> list:
         """
         Filter out rows where Powerstate column equals 'poweredOff'.
@@ -230,14 +169,105 @@ class FileService:
             content = await file.read()
             file_stream = io.BytesIO(content)
 
-            # Detect actual file format by inspecting signature
-            detected_format = self._detect_file_format(file_stream)
-            logger.debug(f"Detected format for {file.filename}: {detected_format}")
+            # Try to load with openpyxl first (for .xlsx files)
+            try:
+                workbook = openpyxl.load_workbook(
+                    file_stream, read_only=True, data_only=True
+                )
+                sheets = {}
 
-            # Load based on detected format using helper method
-            sheets = self._load_by_format(detected_format, file_stream, filter_powered_off, is_stream=True)
-            logger.debug(f"Loaded Excel file from memory with {len(sheets)} sheets")
-            return sheets
+                for sheet_name in workbook.sheetnames:
+                    sheet = workbook[sheet_name]
+                    data = []
+                    headers = []
+
+                    # Get headers from first row
+                    first_row = next(
+                        sheet.iter_rows(min_row=1, max_row=1, values_only=True), None
+                    )
+                    if first_row:
+                        headers = [
+                            str(cell) if cell is not None else f"Column_{i}"
+                            for i, cell in enumerate(first_row)
+                        ]
+
+                    # Get data from remaining rows
+                    for row in sheet.iter_rows(min_row=2, values_only=True):
+                        if any(cell is not None for cell in row):
+                            row_dict = {}
+                            for i, cell in enumerate(row):
+                                if i < len(headers):
+                                    row_dict[headers[i]] = cell
+                            data.append(row_dict)
+
+                    # Apply power state filtering if requested
+                    if filter_powered_off:
+                        data = self._filter_powered_off_rows(data, headers)
+
+                    sheets[sheet_name] = {
+                        "headers": headers,
+                        "data": data,
+                        "row_count": len(data),
+                    }
+
+                workbook.close()
+                logger.debug(f"Loaded Excel file from memory with {len(sheets)} sheets")
+                return sheets
+
+            except BadZipFile:
+                # Reset stream position for xlrd attempt
+                file_stream.seek(0)
+
+                # Try with xlrd for .xls files
+                try:
+                    workbook = xlrd.open_workbook(file_contents=file_stream.read())
+                    sheets = {}
+
+                    for sheet_index in range(workbook.nsheets):
+                        sheet = workbook.sheet_by_index(sheet_index)
+                        sheet_name = sheet.name
+
+                        data = []
+                        headers = []
+
+                        if sheet.nrows > 0:
+                            # Get headers from first row
+                            headers = [
+                                str(sheet.cell_value(0, col))
+                                for col in range(sheet.ncols)
+                            ]
+
+                            # Get data from remaining rows
+                            for row in range(1, sheet.nrows):
+                                row_dict = {}
+                                for col in range(sheet.ncols):
+                                    if col < len(headers):
+                                        row_dict[headers[col]] = sheet.cell_value(
+                                            row, col
+                                        )
+                                data.append(row_dict)
+
+                        # Apply power state filtering if requested
+                        if filter_powered_off:
+                            data = self._filter_powered_off_rows(data, headers)
+
+                        sheets[sheet_name] = {
+                            "headers": headers,
+                            "data": data,
+                            "row_count": len(data),
+                        }
+
+                    logger.debug(
+                        f"Loaded Excel file (xls) from memory with {len(sheets)} sheets"
+                    )
+                    return sheets
+
+                except xlrd.XLRDError as e:
+                    if "password" in str(e).lower() or "encrypted" in str(e).lower():
+                        raise ProtectedFileError(
+                            "File appears to be password protected"
+                        )
+                    raise FileValidationError(f"Error reading Excel file: {str(e)}")
 
         except (ProtectedFileError, FileValidationError):
             # Re-raise our custom exceptions
@@ -265,244 +295,6 @@ class FileService:
             if "content" in locals():
                 del content
 
-    def _handle_xlrd_error(self, e: xlrd.XLRDError, context: str = "") -> None:
-        """
-        Handle xlrd.XLRDError and raise appropriate custom exceptions.
-
-        Args:
-            e: The xlrd.XLRDError exception
-            context: Additional context for the error message
-
-        Raises:
-            FileValidationError: For general file reading errors
-            ProtectedFileError: For password-protected files
-        """
-        error_str = str(e)
-        
-        if "compound document" in error_str.lower() or "ole2" in error_str.lower():
-            message = (
-                "Unable to read Excel file. The file appears to be corrupted or in an unexpected format. "
-                "This can happen if the file was manually edited, has internal structure damage, or was exported incorrectly. "
-                "Try: 1) Re-export from RVTools, 2) Open in Excel and re-save, 3) Ensure the file hasn't been modified outside of Excel."
-            )
-            if context:
-                message = f"{message} Context: {context}"
-            raise FileValidationError(message)
-        
-        if "password" in error_str.lower() or "encrypted" in error_str.lower():
-            raise ProtectedFileError("File appears to be password protected")
-        
-        raise FileValidationError(f"Error reading Excel file: {error_str}")
-
-    def _process_xls_workbook(self, workbook, filter_powered_off: bool = False) -> Dict[str, Any]:
-        """
-        Process an xlrd workbook and return sheets data.
-
-        Args:
-            workbook: xlrd workbook object
-            filter_powered_off: If True, filter out rows where Powerstate column equals 'poweredOff'
-
-        Returns:
-            Dictionary containing sheet data
-        """
-        sheets = {}
-
-        for sheet_index in range(workbook.nsheets):
-            sheet = workbook.sheet_by_index(sheet_index)
-            sheet_name = sheet.name
-
-            data = []
-            headers = []
-
-            if sheet.nrows > 0:
-                # Get headers from first row
-                headers = [
-                    str(sheet.cell_value(0, col))
-                    for col in range(sheet.ncols)
-                ]
-
-                # Get data from remaining rows
-                for row in range(1, sheet.nrows):
-                    row_dict = {}
-                    for col in range(sheet.ncols):
-                        if col < len(headers):
-                            row_dict[headers[col]] = sheet.cell_value(row, col)
-                    data.append(row_dict)
-
-            # Apply power state filtering if requested
-            if filter_powered_off:
-                data = self._filter_powered_off_rows(data, headers)
-
-            sheets[sheet_name] = {
-                "headers": headers,
-                "data": data,
-                "row_count": len(data),
-            }
-
-        logger.debug(f"Loaded Excel file (xls) with {len(sheets)} sheets")
-        return sheets
-
-    def _load_xlsx_stream(self, file_stream: io.BytesIO, filter_powered_off: bool = False) -> Dict[str, Any]:
-        """
-        Load xlsx file from stream using openpyxl.
-
-        Args:
-            file_stream: Byte stream of the xlsx file
-            filter_powered_off: If True, filter out powered off VMs
-
-        Returns:
-            Dictionary containing sheet data
-
-        Raises:
-            FileValidationError: If file cannot be loaded
-        """
-        try:
-            workbook = openpyxl.load_workbook(file_stream, read_only=True, data_only=True)
-        except BadZipFile as e:
-            logger.error(f"ZIP corruption in xlsx file: {e}")
-            raise FileValidationError(
-                "File appears to be corrupted or not a valid Excel file. "
-                "The file has an xlsx signature but cannot be read as a ZIP archive. "
-                "Try re-exporting from RVTools or re-saving in Excel."
-            )
-
-        sheets = {}
-        for sheet_name in workbook.sheetnames:
-            sheet = workbook[sheet_name]
-            data = []
-            headers = []
-
-            # Get headers from first row
-            first_row = next(sheet.iter_rows(min_row=1, max_row=1, values_only=True), None)
-            if first_row:
-                headers = [
-                    str(cell) if cell is not None else f"Column_{i}"
-                    for i, cell in enumerate(first_row)
-                ]
-
-            # Get data from remaining rows
-            for row in sheet.iter_rows(min_row=2, values_only=True):
-                if any(cell is not None for cell in row):
-                    row_dict = {}
-                    for i, cell in enumerate(row):
-                        if i < len(headers):
-                            row_dict[headers[i]] = cell
-                    data.append(row_dict)
-
-            # Apply power state filtering if requested
-            if filter_powered_off:
-                data = self._filter_powered_off_rows(data, headers)
-
-            sheets[sheet_name] = {
-                "headers": headers,
-                "data": data,
-                "row_count": len(data),
-            }
-
-        workbook.close()
-        return sheets
-
-    def _load_xls_stream(self, file_stream: io.BytesIO, filter_powered_off: bool = False) -> Dict[str, Any]:
-        """
-        Load xls file from stream using xlrd.
-
-        Args:
-            file_stream: Byte stream of the xls file
-            filter_powered_off: If True, filter out powered off VMs
-
-        Returns:
-            Dictionary containing sheet data
-
-        Raises:
-            FileValidationError: If file cannot be loaded
-            ProtectedFileError: If file is password protected
-        """
-        try:
-            workbook = xlrd.open_workbook(file_contents=file_stream.read())
-            return self._process_xls_workbook(workbook, filter_powered_off)
-        except xlrd.XLRDError as e:
-            self._handle_xlrd_error(e)
-
-    def _load_xls_path(self, file_path: Path, filter_powered_off: bool = False) -> Dict[str, Any]:
-        """
-        Load xls file from path using xlrd.
-
-        Args:
-            file_path: Path to the xls file
-            filter_powered_off: If True, filter out powered off VMs
-
-        Returns:
-            Dictionary containing sheet data
-
-        Raises:
-            FileValidationError: If file cannot be loaded
-            ProtectedFileError: If file is password protected
-        """
-        try:
-            workbook = xlrd.open_workbook(file_path)
-            return self._process_xls_workbook(workbook, filter_powered_off)
-        except xlrd.XLRDError as e:
-            self._handle_xlrd_error(e)
-
-    def _load_by_format(self, detected_format: str, source, filter_powered_off: bool = False, is_stream: bool = True) -> Dict[str, Any]:
-        """
-        Load Excel file based on detected format.
-
-        Args:
-            detected_format: Detected file format ('xlsx', 'xls', or 'unknown')
-            source: Either BytesIO stream or Path object
-            filter_powered_off: If True, filter out powered off VMs
-            is_stream: True if source is a stream, False if it's a path
-
-        Returns:
-            Dictionary containing sheet data
-
-        Raises:
-            FileValidationError: If file cannot be loaded
-            ProtectedFileError: If file is password protected
-        """
-        if detected_format == 'xlsx':
-            # Use openpyxl for modern Excel files
-            if is_stream:
-                return self._load_xlsx_stream(source, filter_powered_off)
-            else:
-                stream = io.BytesIO()
-                with open(source, 'rb') as f:
-                    stream.write(f.read())
-                stream.seek(0)
-                return self._load_xlsx_stream(stream, filter_powered_off)
-        
-        elif detected_format == 'xls':
-            # Use xlrd for legacy Excel files
-            if is_stream:
-                return self._load_xls_stream(source, filter_powered_off)
-            else:
-                return self._load_xls_path(source, filter_powered_off)
-        
-        else:
-            # Unknown format - try both methods as fallback
-            logger.warning("Unknown file format, attempting openpyxl first")
-            try:
-                if is_stream:
-                    return self._load_xlsx_stream(source, filter_powered_off)
-                else:
-                    stream = io.BytesIO()
-                    with open(source, 'rb') as f:
-                        stream.write(f.read())
-                    stream.seek(0)
-                    return self._load_xlsx_stream(stream, filter_powered_off)
-            except (BadZipFile, FileValidationError):
-                # Try with xlrd for .xls files
-                if is_stream:
-                    source.seek(0)
-                try:
-                    if is_stream:
-                        return self._load_xls_stream(source, filter_powered_off)
-                    else:
-                        return self._load_xls_path(source, filter_powered_off)
-                except xlrd.XLRDError as e:
-                    self._handle_xlrd_error(e, "file format could not be determined")
-
     def load_excel_file(self, file_path: Path, filter_powered_off: bool = False) -> Dict[str, Any]:
         """
         Load Excel file and return sheets data.
@@ -525,14 +317,100 @@ class FileService:
 
             logger.debug(f"Loading Excel file: {file_path}")
 
-            # Detect actual file format by inspecting signature
-            detected_format = self._detect_file_format_from_path(file_path)
-            logger.debug(f"Detected format for {file_path}: {detected_format}")
+            # Try to load with openpyxl first (for .xlsx files)
+            try:
+                workbook = openpyxl.load_workbook(
+                    file_path, read_only=True, data_only=True
+                )
+                sheets = {}
 
-            # Load based on detected format using helper method
-            sheets = self._load_by_format(detected_format, file_path, filter_powered_off, is_stream=False)
-            logger.debug(f"Loaded Excel file with {len(sheets)} sheets")
-            return sheets
+                for sheet_name in workbook.sheetnames:
+                    sheet = workbook[sheet_name]
+                    data = []
+                    headers = []
+
+                    # Get headers from first row
+                    first_row = next(
+                        sheet.iter_rows(min_row=1, max_row=1, values_only=True), None
+                    )
+                    if first_row:
+                        headers = [
+                            str(cell) if cell is not None else f"Column_{i}"
+                            for i, cell in enumerate(first_row)
+                        ]
+
+                    # Get data from remaining rows
+                    for row in sheet.iter_rows(min_row=2, values_only=True):
+                        if any(cell is not None for cell in row):
+                            row_dict = {}
+                            for i, cell in enumerate(row):
+                                if i < len(headers):
+                                    row_dict[headers[i]] = cell
+                            data.append(row_dict)
+
+                    # Apply power state filtering if requested
+                    if filter_powered_off:
+                        data = self._filter_powered_off_rows(data, headers)
+
+                    sheets[sheet_name] = {
+                        "headers": headers,
+                        "data": data,
+                        "row_count": len(data),
+                    }
+
+                workbook.close()
+                logger.debug(f"Loaded Excel file with {len(sheets)} sheets")
+                return sheets
+
+            except BadZipFile:
+                # Try with xlrd for .xls files
+                try:
+                    workbook = xlrd.open_workbook(file_path)
+                    sheets = {}
+
+                    for sheet_index in range(workbook.nsheets):
+                        sheet = workbook.sheet_by_index(sheet_index)
+                        sheet_name = sheet.name
+
+                        data = []
+                        headers = []
+
+                        if sheet.nrows > 0:
+                            # Get headers from first row
+                            headers = [
+                                str(sheet.cell_value(0, col))
+                                for col in range(sheet.ncols)
+                            ]
+
+                            # Get data from remaining rows
+                            for row in range(1, sheet.nrows):
+                                row_dict = {}
+                                for col in range(sheet.ncols):
+                                    if col < len(headers):
+                                        row_dict[headers[col]] = sheet.cell_value(
+                                            row, col
+                                        )
+                                data.append(row_dict)
+
+                        # Apply power state filtering if requested
+                        if filter_powered_off:
+                            data = self._filter_powered_off_rows(data, headers)
+
+                        sheets[sheet_name] = {
+                            "headers": headers,
+                            "data": data,
+                            "row_count": len(data),
+                        }
+
+                    logger.debug(f"Loaded Excel file (xls) with {len(sheets)} sheets")
+                    return sheets
+
+                except xlrd.XLRDError as e:
+                    if "password" in str(e).lower() or "encrypted" in str(e).lower():
+                        raise ProtectedFileError(
+                            "File appears to be password protected"
+                        )
+                    raise FileValidationError(f"Error reading Excel file: {str(e)}")
 
         except (ProtectedFileError, FileValidationError):
             # Re-raise our custom exceptions
