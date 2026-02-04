@@ -6,7 +6,48 @@
 <div class="container">
     <h1 class="text-center text-danger">Error</h1>
     <p class="text-center lead">{{ message }}</p>
-    <div class="text-center">
+    
+    {% if is_file_validation_error %}
+    <div class="alert alert-info mt-4" role="alert">
+        <h5 class="alert-heading"><i class="bi bi-info-circle"></i> Possible Causes and Solutions</h5>
+        <hr>
+        <div class="mb-3">
+            <strong>1. Security Label or File Protection:</strong>
+            <ul class="mb-2">
+                <li>The file may have a security label or protection applied by your organization</li>
+                <li>Try removing any security classifications or labels from the file</li>
+                <li>If the file is password-protected, remove the password protection before uploading</li>
+            </ul>
+        </div>
+        <div class="mb-3">
+            <strong>2. Invalid File Format:</strong>
+            <ul class="mb-2">
+                <li>Ensure you're uploading a valid Excel file (.xlsx or .xls) exported from RVTools</li>
+                <li>The file should be a genuine RVTools export, not renamed or converted from another format</li>
+                <li>Verify the file extension matches the actual file format</li>
+            </ul>
+        </div>
+        <div class="mb-3">
+            <strong>3. Corrupted File:</strong>
+            <ul class="mb-2">
+                <li>The file may have been corrupted during download or transfer</li>
+                <li>Try re-exporting the data from RVTools</li>
+                <li>If downloaded from email or cloud storage, try downloading again</li>
+                <li>Verify the file opens correctly in Excel before uploading</li>
+            </ul>
+        </div>
+        <div class="mb-0">
+            <strong>Quick Fixes:</strong>
+            <ul class="mb-0">
+                <li>Open the file in Excel and save it as a new file (File → Save As)</li>
+                <li>Ensure no macros or VBA code are embedded in the file</li>
+                <li>Try exporting a fresh copy directly from RVTools</li>
+            </ul>
+        </div>
+    </div>
+    {% endif %}
+    
+    <div class="text-center mt-4">
         <a href="/" class="btn btn-primary">Go Back to Home</a>
     </div>
 </div>
