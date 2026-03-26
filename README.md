@@ -1,3 +1,12 @@
+
+> The **AVS RVTools Analyzer** is now available as a plugin within [az-scout.com](https://docs.az-scout.com).  
+> All current project capabilities have been migrated to the new repository:  
+> 👉 [az-scout/az-scout-plugin-avs-rvtools-analyser](https://github.com/az-scout/az-scout-plugin-avs-rvtools-analyser)  
+>  
+> The current repository will soon transition to an archived state.  
+>  
+> Continue using the tool through **Azure Scout** — and discover its enhanced capabilities!
+
 # AI supercharged RVTools Analyzer for Azure VMware Solution
 
 A unified FastAPI application for analyzing RVTools data with both web interface and AI integration capabilities.
